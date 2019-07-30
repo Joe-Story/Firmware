@@ -383,26 +383,14 @@ void Simulator::handle_message_hil_sensor(const mavlink_message_t *msg)
 		}
 
 		float ibatt = -1.0f; // no current sensor in simulation
-<<<<<<< HEAD
+
                 const float minimum_percentage = 0.50f; // change this value if you want to simulate low battery reaction
-=======
->>>>>>> 72a449490a9ad05679dc6f3d2a91d0042eaac842
 
 		/* Simulate the voltage of a linearly draining battery but stop at the minimum percentage */
 		float battery_percentage = 1.0f - (now_us - batt_sim_start) / discharge_interval_us;
 
-<<<<<<< HEAD
 		battery_percentage = math::max(battery_percentage, minimum_percentage);
                 float vbatt = math::gradual(battery_percentage, 0.f, 1.f, _battery.empty_cell_voltage(), _battery.full_cell_voltage());
-=======
-		battery_percentage = math::max(battery_percentage, _battery_min_percentage.get() / 100.f);
-		float vbatt = math::gradual(battery_percentage, 0.f, 1.f, _battery.empty_cell_voltage(), _battery.full_cell_voltage());
-		vbatt *= _battery.cell_count();
->>>>>>> 72a449490a9ad05679dc6f3d2a91d0042eaac842
-
-                //New code
-//              float vbatt = _battery.full_cell_voltage() * battery_percentage;
-                //End new code
 
                 vbatt *= _battery.cell_count();
 
