@@ -116,7 +116,7 @@ int thrust_logger_main(int argc, char *argv[])
                 PX4_INFO("Thrust:\t%8.4f",
                          (double)raw_act.control[3]);
 
-                fprintf(fptr, "%f %s", (double)raw_act.control[3], ", ");
+                fprintf(fptr, "%f ,\n", (double)raw_act.control[3]);
 
                 act.control[1] = raw_act.control[1];
                 act.control[2] = raw_act.control[2];
