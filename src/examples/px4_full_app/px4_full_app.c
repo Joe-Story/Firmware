@@ -50,26 +50,36 @@
 #include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/actuator_controls.h>
 
-__EXPORT int px4_simple_app_main(int argc, char *argv[]);
+__EXPORT int px4_full_app_main(int argc, char *argv[]);
 
-int px4_simple_app_main(int argc, char *argv[])
+int px4_full_app_main(int argc, char *argv[])
 {
-    PX4_INFO("Hello Joe!");
+    PX4_INFO("Hello Sky!");
 
     /* subscribe to sensor_combined topic */
     int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_combined));
+    int actuator_sub_fd = orb_subscribe(ORB_ID(actuator_controls));
     /* limit the update rate to 5 Hz */
     orb_set_interval(sensor_sub_fd, 200);
+    orb_set_interval(actuator_sub_fd, 200);
 
     /* advertise attitude topic */
     struct vehicle_attitude_s att;
     memset(&att, 0, sizeof(att));
     orb_advert_t att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
 
+    /* advertise actuator topic */
+    struct actuator_controls_s act;
+    memset(&act, 0, sizeof(act));
+    orb_advert_t act_pub = orb_advertise(ORB_ID(actuator_controls), &act);
+
+
     /* one could wait for multiple topics with this technique, just using one here */
     px4_pollfd_struct_t fds[] = {
         { .fd = sensor_sub_fd,   .events = POLLIN },
+        { .fd = actuator_sub_fd, .events = POLLIN },
         /* there could be more file descriptors here, in the form like:
          * { .fd = other_sub_fd,   .events = POLLIN },
          */
@@ -77,7 +87,7 @@ int px4_simple_app_main(int argc, char *argv[])
 
     int error_counter = 0;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         /* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
         int poll_ret = px4_poll(fds, 1, 1000);
 
@@ -99,22 +109,39 @@ int px4_simple_app_main(int argc, char *argv[])
 
             if (fds[0].revents & POLLIN) {
                 /* obtained data for the first file descriptor */
-                struct sensor_combined_s raw;
+                struct sensor_combined_s raw_att;
                 /* copy sensors raw data into local buffer */
-                orb_copy(ORB_ID(sensor_combined), sensor_sub_fd, &raw);
+                orb_copy(ORB_ID(sensor_combined), sensor_sub_fd, &raw_att);
                 PX4_INFO("Accelerometer:\t%8.4f\t%8.4f\t%8.4f",
-                     (double)raw.accelerometer_m_s2[0],
-                     (double)raw.accelerometer_m_s2[1],
-                     (double)raw.accelerometer_m_s2[2]);
+                     (double)raw_att.accelerometer_m_s2[0],
+                     (double)raw_att.accelerometer_m_s2[1],
+                     (double)raw_att.accelerometer_m_s2[2]);
 
                 /* set att and publish this information for other apps
                  the following does not have any meaning, it's just an example
                 */
-                att.q[0] = raw.accelerometer_m_s2[0];
-                att.q[1] = raw.accelerometer_m_s2[1];
-                att.q[2] = raw.accelerometer_m_s2[2];
+                att.q[0] = raw_att.accelerometer_m_s2[0];
+                att.q[1] = raw_att.accelerometer_m_s2[1];
+                att.q[2] = raw_att.accelerometer_m_s2[2];
 
                 orb_publish(ORB_ID(vehicle_attitude), att_pub, &att);
+            }
+
+            if (fds[1].revents & POLLIN) {
+                struct actuator_controls_s raw_act;
+                orb_copy(ORB_ID(actuator_controls), actuator_sub_fd, &raw_act);
+                PX4_INFO("Reached section B");
+                PX4_INFO("Actuator Controls:\t%8.4f\t%8.4f\t%8.4f",
+                         (double)raw_act.control[1],
+                         (double)raw_act.control[2],
+                         (double)raw_act.control[3]);
+
+                act.control[1] = raw_act.control[1];
+                act.control[2] = raw_act.control[2];
+                act.control[3] = raw_act.control[3];
+
+                orb_publish(ORB_ID(actuator_controls), act_pub, &act);
+
             }
 
             /* there could be more file descriptors here, in the form like:

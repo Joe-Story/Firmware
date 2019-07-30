@@ -52,6 +52,9 @@
 #include <mathlib/math/Limits.hpp>
 #include <mathlib/math/Functions.hpp>
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #define TPA_RATE_LOWER_LIMIT 0.05f
 
 #define AXIS_INDEX_ROLL 0
@@ -79,7 +82,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_rates_prev_filtered.zero();
 	_rates_sp.zero();
 	_rates_int.zero();
-	_thrust_sp = 0.0f;
+        _thrust_sp = 0.0f;
 	_att_control.zero();
 
 	/* initialize thermal corrections as we might not immediately get a topic update (only non-zero values) */

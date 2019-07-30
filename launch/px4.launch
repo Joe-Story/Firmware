@@ -6,6 +6,7 @@
     <!-- PX4 config arguments -->
     <arg name="est" default="ekf2"/>
     <arg name="vehicle" default="iris"/>
+    <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/warehouse.world"/>
     <arg name="ID" default="0"/>
     <arg name="interactive" default="true"/>
 
