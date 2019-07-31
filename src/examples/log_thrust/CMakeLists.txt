@@ -31,11 +31,11 @@
 #
 ############################################################################
 px4_add_module(
-    MODULE examples__thrust_logger
-    MAIN thrust_logger
+    MODULE examples__log_thrust
+    MAIN log_thrust
     STACK_MAIN 2000
     SRCS
-            thrust_logger.c
+            log_thrust.c
     DEPENDS
 
     )

@@ -42,8 +42,11 @@
 #include <px4_tasks.h>
 #include <px4_module.h>
 
+#include <uORB/uORB.h>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
+#include <uORB/topics/actuator_outputs.h>
+#include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_combined.h>
@@ -66,6 +69,19 @@
 #include "mc_pos_control/PositionControl.hpp"
 #include "mc_pos_control/Utility/ControlMath.hpp"
 //#include <mc_pos_control/Takeoff.hpp>
+
+void delay(int number_of_seconds)
+{
+    // Converting time into milli_seconds
+    int milli_seconds = 1000 * number_of_seconds;
+
+    // Stroing start time
+    clock_t start_time = clock();
+
+    // looping till required time is not acheived
+    while (clock() < start_time + milli_seconds)
+        ;
+}
 
 __EXPORT int module_main(int argc, char *argv[]);
 
@@ -99,7 +115,7 @@ int Module::custom_command(int argc, char *argv[])
 
 int Module::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("module",
+        _task_id = px4_task_spawn_cmd("module",
 				      SCHED_DEFAULT,
 				      SCHED_PRIORITY_DEFAULT,
 				      1024,
@@ -166,45 +182,106 @@ Module::Module(int example_param, bool example_flag)
 
 void Module::run()
 {
-	// Example: run the loop synchronized to the sensor_combined topic publication
-	int sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+    PX4_INFO("Hello Sky!");
 
-	px4_pollfd_struct_t fds[1];
-	fds[0].fd = sensor_combined_sub;
-	fds[0].events = POLLIN;
+    /* subscribe to sensor_combined topic */
+    int actuator_sub_fd = orb_subscribe(ORB_ID(actuator_outputs));
+    int armed_sub_fd = orb_subscribe(ORB_ID(actuator_armed));
+    /* limit the update rate to 5 Hz */
+    orb_set_interval(actuator_sub_fd, 200);
+    orb_set_interval(armed_sub_fd, 200);
 
-	// initialize parameters
-	int parameter_update_sub = orb_subscribe(ORB_ID(parameter_update));
-	parameters_update(parameter_update_sub, true);
+    /* advertise actuator topic */
+    struct actuator_outputs_s act;
+    struct actuator_armed_s arm;
+    memset(&act, 0, sizeof(act));
+    memset(&arm, 0, sizeof(arm));
+    //orb_advert_t act_pub = orb_advertise(ORB_ID(actuator_outputs), &act);
 
-	while (!should_exit()) {
+    /* one could wait for multiple topics with this technique, just using one here */
+    px4_pollfd_struct_t fds[] = {
+        { .fd = actuator_sub_fd, .events = POLLIN },
+        /* there could be more file descriptors here, in the form like:
+         * { .fd = other_sub_fd,   .events = POLLIN },
+         */
+    };
 
-		// wait for up to 1000ms for data
-		int pret = px4_poll(fds, (sizeof(fds) / sizeof(fds[0])), 1000);
+    int error_counter = 0;
 
-		if (pret == 0) {
-			// Timeout: let the loop run anyway, don't do `continue` here
+    FILE *fptr;
+    fptr = fopen("/home/joestory/src/Firmware/src/modules/module/logged_data.txt", "w");
+    if(fptr == NULL){
+        printf("Error! File not opened ");
+        printf("");
+        return;
+    }
 
-		} else if (pret < 0) {
-			// this is undesirable but not much we can do
-            PX4_ERR("poll error %d, %d", pret, 0); //*** 0 was errno ***
-			px4_usleep(50000);
-			continue;
+    fprintf(fptr, "%s", "Body Thrust: ");
 
-		} else if (fds[0].revents & POLLIN) {
+    //Check to see if the drone is armed
+    orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
 
-			struct sensor_combined_s sensor_combined;
-			orb_copy(ORB_ID(sensor_combined), sensor_combined_sub, &sensor_combined);
-			// TODO: do something with the data...
-
-		}
+    while (arm.armed == false){
+        PX4_INFO("You are not armed!");
+        delay(1000);
+        orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
+    }
 
 
-		parameters_update(parameter_update_sub);
-	}
+    while (arm.armed == true) {
+        /* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
+        int poll_ret = px4_poll(fds, 1, 1000);
+        orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
 
-	orb_unsubscribe(sensor_combined_sub);
-	orb_unsubscribe(parameter_update_sub);
+        /* handle the poll result */
+        if (poll_ret == 0) {
+            /* this means none of our providers is giving us data */
+            PX4_ERR("Got no data within a second");
+
+        } else if (poll_ret < 0) {
+            /* this is seriously bad - should be an emergency */
+            if (error_counter < 10 || error_counter % 50 == 0) {
+                /* use a counter to prevent flooding (and slowing us down) */
+                PX4_ERR("ERROR return value from poll(): %d", poll_ret);
+            }
+
+            error_counter++;
+
+        } else {
+
+            if (fds[0].revents & POLLIN) {
+                struct actuator_outputs_s raw_act;
+                orb_copy(ORB_ID(actuator_outputs), actuator_sub_fd, &raw_act);
+                PX4_INFO("Thrust:\t%8.4f,\t%8.4f,\t%8.4f,\t%8.4f",
+                         (double)raw_act.output[0],
+                         (double)raw_act.output[1],
+                         (double)raw_act.output[2],
+                         (double)raw_act.output[3]);
+
+                fprintf(fptr, "%f , %f , %f , %f ,\n", (double)raw_act.output[0], (double)raw_act.output[1], (double)raw_act.output[2], (double)raw_act.output[3]);
+
+//                act.control[1] = raw_act.control[1];
+//                act.control[2] = raw_act.control[2];
+//                act.control[3] = raw_act.control[3];
+
+                //orb_publish(ORB_ID(actuator_outputs), act_pub, &act);
+
+            }
+
+            /* there could be more file descriptors here, in the form like:
+             * if (fds[1..n].revents & POLLIN) {}
+             */
+        }
+    }
+
+    PX4_INFO("exiting");
+
+    fclose(fptr);
+
+    PX4_INFO("Module has finished, please exit");
+    delay(50000);
+
+    return;
 }
 
 void Module::parameters_update(int parameter_update_sub, bool force)

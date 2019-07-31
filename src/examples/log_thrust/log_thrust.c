@@ -48,27 +48,46 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/actuator_outputs.h>
+#include <uORB/topics/actuator_armed.h>
 
-__EXPORT int thrust_logger_main(int argc, char *argv[]);
+void delay(int number_of_seconds)
+{
+    // Converting time into milli_seconds
+    int milli_seconds = 1000 * number_of_seconds;
 
-int thrust_logger_main(int argc, char *argv[])
+    // Stroing start time
+    clock_t start_time = clock();
+
+    // looping till required time is not acheived
+    while (clock() < start_time + milli_seconds)
+        ;
+}
+
+__EXPORT int log_thrust_main(int argc, char *argv[]);
+
+int log_thrust_main(int argc, char *argv[])
 {
     PX4_INFO("Hello Sky!");
 
     /* subscribe to sensor_combined topic */
-    int actuator_sub_fd = orb_subscribe(ORB_ID(actuator_controls_0));
+    int actuator_sub_fd = orb_subscribe(ORB_ID(actuator_outputs));
+    int armed_sub_fd = orb_subscribe(ORB_ID(actuator_armed));
     /* limit the update rate to 5 Hz */
     orb_set_interval(actuator_sub_fd, 200);
+    orb_set_interval(armed_sub_fd, 200);
 
     /* advertise actuator topic */
-    struct actuator_controls_s act;
+    struct actuator_outputs_s act;
+    struct actuator_armed_s arm;
     memset(&act, 0, sizeof(act));
-    orb_advert_t act_pub = orb_advertise(ORB_ID(actuator_controls_0), &act);
+    memset(&arm, 0, sizeof(arm));
+    //orb_advert_t act_pub = orb_advertise(ORB_ID(actuator_outputs), &act);
 
     /* one could wait for multiple topics with this technique, just using one here */
     px4_pollfd_struct_t fds[] = {
@@ -81,7 +100,7 @@ int thrust_logger_main(int argc, char *argv[])
     int error_counter = 0;
 
     FILE *fptr;
-    fptr = fopen("/home/joestory/src/Firmware/src/examples/thrust_logger/logged_data.txt", "w");
+    fptr = fopen("/home/joestory/src/Firmware/src/examples/log_thrust/logged_data.txt", "w");
     if(fptr == NULL){
         printf("Error! File not opened ");
         printf("");
@@ -90,9 +109,20 @@ int thrust_logger_main(int argc, char *argv[])
 
     fprintf(fptr, "%s", "Body Thrust: ");
 
-    for (int i = 0; i < 1000; i++) {
+    //Check to see if the drone is armed
+    orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
+
+    while (arm.armed == false){
+        PX4_INFO("You are not armed!");
+        delay(1000);
+        orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
+    }
+
+
+    while (arm.armed == true) {
         /* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
         int poll_ret = px4_poll(fds, 1, 1000);
+        orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
 
         /* handle the poll result */
         if (poll_ret == 0) {
@@ -111,18 +141,21 @@ int thrust_logger_main(int argc, char *argv[])
         } else {
 
             if (fds[0].revents & POLLIN) {
-                struct actuator_controls_s raw_act;
-                orb_copy(ORB_ID(actuator_controls_0), actuator_sub_fd, &raw_act);
-                PX4_INFO("Thrust:\t%8.4f",
-                         (double)raw_act.control[3]);
+                struct actuator_outputs_s raw_act;
+                orb_copy(ORB_ID(actuator_outputs), actuator_sub_fd, &raw_act);
+                PX4_INFO("Thrust:\t%8.4f,\t%8.4f,\t%8.4f,\t%8.4f",
+                         (double)raw_act.output[0],
+                         (double)raw_act.output[1],
+                         (double)raw_act.output[2],
+                         (double)raw_act.output[3]);
 
-                fprintf(fptr, "%f ,\n", (double)raw_act.control[3]);
+                fprintf(fptr, "%f , %f , %f , %f ,\n", (double)raw_act.output[0], (double)raw_act.output[1], (double)raw_act.output[2], (double)raw_act.output[3]);
 
-                act.control[1] = raw_act.control[1];
-                act.control[2] = raw_act.control[2];
-                act.control[3] = raw_act.control[3];
+//                act.control[1] = raw_act.control[1];
+//                act.control[2] = raw_act.control[2];
+//                act.control[3] = raw_act.control[3];
 
-                orb_publish(ORB_ID(actuator_controls), act_pub, &act);
+                //orb_publish(ORB_ID(actuator_outputs), act_pub, &act);
 
             }
 

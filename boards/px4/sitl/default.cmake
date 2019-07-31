@@ -40,11 +40,11 @@ px4_add_board(
 		mavlink
 		mc_att_control
 		mc_pos_control
-                module
 		navigator
 		replay
 		sensors
 		simulator
+                module
 		vmount
 		vtol_att_control
 		wind_estimator
@@ -79,13 +79,14 @@ px4_add_board(
 		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		hello
 		#hwtest # Hardware test
+                log_thrust #Joe's thrust logger
 		position_estimator_inav
                 px4_full_app # Joe's first full application
 		px4_mavlink_debug # Tutorial code from http://dev.px4.io/en/debug/debug_values.html
 		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
 		rover_steering_control # Rover example app
 		segway
-		thrust_logger #Joe's thrust logger
+
 	)
 
 set(config_sitl_viewer jmavsim CACHE STRING "viewer for sitl")
