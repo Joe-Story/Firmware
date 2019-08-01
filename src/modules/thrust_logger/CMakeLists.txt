@@ -32,11 +32,11 @@
 ############################################################################
 
 px4_add_module(
-        MODULE modules__module
-	MAIN module
+        MODULE modules__thrust_logger
+	MAIN thrust_logger
 	STACK_MAIN 1024
 	SRCS
-		module.cpp
+		thrust_logger.cpp
 	DEPENDS
 		modules__uORB
 	)

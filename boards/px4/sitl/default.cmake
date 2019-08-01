@@ -44,7 +44,7 @@ px4_add_board(
 		replay
 		sensors
 		simulator
-                module
+                thrust_logger
 		vmount
 		vtol_att_control
 		wind_estimator

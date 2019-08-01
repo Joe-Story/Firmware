@@ -36,7 +36,7 @@
 #include <px4_module.h>
 #include <px4_module_params.h>
 
-extern "C" __EXPORT int module_main(int argc, char *argv[]);
+extern "C" __EXPORT int thrust_logger_main(int argc, char *argv[]);
 
 
 class Module : public ModuleBase<Module>, public ModuleParams

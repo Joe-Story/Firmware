@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "module.h"
+#include "thrust_logger.h"
 
 #include <px4_getopt.h>
 #include <px4_log.h>
@@ -83,7 +83,7 @@ void delay(int number_of_seconds)
         ;
 }
 
-__EXPORT int module_main(int argc, char *argv[]);
+__EXPORT int thrust_logger_main(int argc, char *argv[]);
 
 int Module::print_status()
 {
@@ -115,7 +115,7 @@ int Module::custom_command(int argc, char *argv[])
 
 int Module::task_spawn(int argc, char *argv[])
 {
-        _task_id = px4_task_spawn_cmd("module",
+        _task_id = px4_task_spawn_cmd("thrust_logger",
 				      SCHED_DEFAULT,
 				      SCHED_PRIORITY_DEFAULT,
 				      1024,
@@ -209,7 +209,7 @@ void Module::run()
     int error_counter = 0;
 
     FILE *fptr;
-    fptr = fopen("/home/joestory/src/Firmware/src/modules/module/logged_data.txt", "w");
+    fptr = fopen("/home/joestory/src/Firmware/src/modules/thrust_logger/logged_data.txt", "w");
     if(fptr == NULL){
         printf("Error! File not opened ");
         printf("");
@@ -331,7 +331,7 @@ $ module start -f -p 42
 	return 0;
 }
 
-int module_main(int argc, char *argv[])
+int thrust_logger_main(int argc, char *argv[])
 {
         return Module::main(argc, argv);
 }
