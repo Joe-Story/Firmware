@@ -73,6 +73,12 @@ static hrt_abstime batt_sim_start = 0;
 const unsigned mode_flag_armed = 128;
 const unsigned mode_flag_custom = 1;
 
+float battery_percentage = 1.0f;
+float prev_time = 0.0f;
+float gps_vn = 0.0f;
+float gps_ve = 0.0f;
+float gps_vd = 0.0f;
+
 using namespace simulator;
 using namespace time_literals;
 
@@ -288,6 +294,11 @@ void Simulator::update_gps(const mavlink_hil_gps_t *gps_sim)
 	gps.satellites_visible = gps_sim->satellites_visible;
 
 	write_gps_data((void *)&gps);
+
+        //Used for power consumption model
+        gps_vn = gps.vn;
+        gps_ve = gps.ve;
+        gps_vd = gps.vd;
 }
 
 void Simulator::handle_message(const mavlink_message_t *msg)
@@ -372,18 +383,19 @@ void Simulator::handle_message_hil_sensor(const mavlink_message_t *msg)
 
 	update_sensors(now_us, imu);
 
-
+        float dt;
 
 	// battery simulation (limit update to 100Hz)
 	if (hrt_elapsed_time(&_battery_status.timestamp) >= 10_ms) {
 
-            float vert_vel = 0.0f;
+            //float vert_vel = 0.0f;
 
             //const float discharge_interval_us = _param_sim_bat_drain.get() * 1000 * 1000;
             float mass = 1.38, rho = 1.225, g = 9.81, area = 0.180956, bat_energy = 81.3, power;
 
-            //Calculate the power required for the drone to hover and gain altitude
-            power = sqrt((2*pow(mass, 3)*pow(g, 3))/(rho*area)) + (mass*g*vert_vel);
+            //Calculate the power required for the drone to hover and gain altitude (Velocity and acceleration are currently not in the same direction)
+            power = sqrt((2*pow(mass, 3)*pow(g, 3))/(rho*area)) + (mass*g*(-gps_vd));
+            //+ (mass * abs(imu.xacc) * abs(gps_vn)) + (mass * abs(imu.yacc) * abs(gps_ve)) + (mass * abs(imu.zacc - 9.81) * abs(gps_vd));
 
 
             bool armed = (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
@@ -396,19 +408,26 @@ void Simulator::handle_message_hil_sensor(const mavlink_message_t *msg)
 
             const float minimum_percentage = 0.05f; // change this value if you want to simulate low battery reaction
 
+
+            dt = now_us - prev_time;
             /* Simulate the voltage of a linearly draining battery but stop at the minimum percentage */
             //float battery_percentage = 1.0f - (now_us - batt_sim_start) / discharge_interval_us;
-            float battery_percentage = (bat_energy*3600-(power*((now_us - batt_sim_start)/pow(10,6))))/(bat_energy*3600);
+
+            //Decrement the battery percentage by the total percent of battery energy used in the last time period
+            if (now_us - batt_sim_start >= 1){
+                battery_percentage -= (power*((dt)/pow(10,6)))/(bat_energy*3600);
+            }
 
             battery_percentage = math::max(battery_percentage, minimum_percentage);
             float vbatt = _battery.empty_cell_voltage() + battery_percentage * (_battery.full_cell_voltage() - _battery.empty_cell_voltage());
             //float vbatt = math::gradual(battery_percentage, 0.f, 1.f, _battery.empty_cell_voltage(), _battery.full_cell_voltage());
 
             vbatt *= _battery.cell_count();
-            // **** Code currently doesn't take into account the number of cells, this needs to be done ****
 
             const float throttle = 0.0f; // simulate no throttle compensation to make the estimate predictable
             _battery.updateBatteryStatus(now_us, vbatt, ibatt, true, true, 0, throttle, armed, &_battery_status);
+
+            prev_time = now_us;
 
             // publish the battery voltage
             int batt_multi;

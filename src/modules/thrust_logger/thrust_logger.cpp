@@ -216,7 +216,7 @@ void Module::run()
         return;
     }
 
-    fprintf(fptr, "%s", "Body Thrust: ");
+    //fprintf(fptr, "%s", "Body Thrust: ");
 
     //Check to see if the drone is armed
     orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
