@@ -518,6 +518,7 @@ bool set_nav_state(vehicle_status_s *status, actuator_armed_s *armed, commander_
 		} else if (!stay_in_failsafe) {
 			/* stay where you are if you should stay in failsafe, otherwise everything is perfect */
 			status->nav_state = vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION;
+                        //PX4_WARN("Nav state changed (state_machine_helper.cpp)");
 		}
 
 		break;

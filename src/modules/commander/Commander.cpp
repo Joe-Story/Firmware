@@ -446,6 +446,7 @@ int commander_main(int argc, char *argv[])
 
 			} else if (!strcmp(argv[2], "auto:mission")) {
 				new_main_state = commander_state_s::MAIN_STATE_AUTO_MISSION;
+                                PX4_WARN("Auto mission has started");
 
 			} else if (!strcmp(argv[2], "auto:loiter")) {
 				new_main_state = commander_state_s::MAIN_STATE_AUTO_LOITER;

@@ -1117,6 +1117,8 @@ dm_read(dm_item_t item, unsigned index, void *buf, size_t count)
 		return -1;
 	}
 
+        //printf("Dataman Read");
+
 	work->func = dm_read_func;
 	work->read_params.item = item;
 	work->read_params.index = index;

@@ -586,7 +586,7 @@ MissionFeasibilityChecker::checkDistancesBetweenWaypoints(const mission_s &missi
 	/* Go through all waypoints */
 	for (size_t i = 0; i < mission.count; i++) {
 
-		struct mission_item_s mission_item {};
+            struct mission_item_s mission_item {};
 
 		if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
 			/* error reading, mission is invalid */

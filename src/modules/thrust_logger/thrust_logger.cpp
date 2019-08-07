@@ -182,7 +182,7 @@ Module::Module(int example_param, bool example_flag)
 
 void Module::run()
 {
-    PX4_INFO("Hello Sky!");
+    PX4_INFO("Thrust Logger Started!");
 
     /* subscribe to sensor_combined topic */
     int actuator_sub_fd = orb_subscribe(ORB_ID(actuator_outputs));
@@ -192,9 +192,9 @@ void Module::run()
     orb_set_interval(armed_sub_fd, 200);
 
     /* advertise actuator topic */
-    struct actuator_outputs_s act;
+    struct actuator_outputs_s raw_act;
     struct actuator_armed_s arm;
-    memset(&act, 0, sizeof(act));
+    memset(&raw_act, 0, sizeof(raw_act));
     memset(&arm, 0, sizeof(arm));
     //orb_advert_t act_pub = orb_advertise(ORB_ID(actuator_outputs), &act);
 
@@ -220,7 +220,6 @@ void Module::run()
 
     //Check to see if the drone is armed
     orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
-
     while (arm.armed == false){
         PX4_INFO("You are not armed!");
         delay(1000);
@@ -250,7 +249,6 @@ void Module::run()
         } else {
 
             if (fds[0].revents & POLLIN) {
-                struct actuator_outputs_s raw_act;
                 orb_copy(ORB_ID(actuator_outputs), actuator_sub_fd, &raw_act);
                 PX4_INFO("Thrust:\t%8.4f,\t%8.4f,\t%8.4f,\t%8.4f",
                          (double)raw_act.output[0],
