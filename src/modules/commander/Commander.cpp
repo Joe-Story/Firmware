@@ -617,6 +617,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_MODE: {
+			PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE");
 			uint8_t base_mode = (uint8_t)cmd.param1;
 			uint8_t custom_main_mode = (uint8_t)cmd.param2;
 			uint8_t custom_sub_mode = (uint8_t)cmd.param3;
@@ -632,14 +633,17 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 			if (base_mode & VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED) {
 				/* use autopilot-specific mode */
 				if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_MANUAL) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-1");
 					/* MANUAL */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_MANUAL, status_flags, &internal_state);
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_ALTCTL) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-2");
 					/* ALTCTL */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_ALTCTL, status_flags, &internal_state);
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_POSCTL) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-3");
 					/* POSCTL */
 					reset_posvel_validity(changed);
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_POSCTL, status_flags, &internal_state);
@@ -651,11 +655,13 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 
 						switch (custom_sub_mode) {
 						case PX4_CUSTOM_SUB_MODE_AUTO_LOITER:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-4");
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_LOITER, status_flags,
 											 &internal_state);
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_MISSION:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-5");
 							if (status_flags.condition_auto_mission_available) {
 								main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_MISSION, status_flags,
 												 &internal_state);
@@ -667,29 +673,37 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_RTL:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-6");
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_RTL, status_flags, &internal_state);
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-7");
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_TAKEOFF, status_flags,
 											 &internal_state);
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_LAND:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-8");
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_LAND, status_flags, &internal_state);
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_FOLLOW_TARGET:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-9");
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_FOLLOW_TARGET, status_flags,
 											 &internal_state);
 							break;
 
 						case PX4_CUSTOM_SUB_MODE_AUTO_PRECLAND:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-10");
+
 							main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_PRECLAND, status_flags,
 											 &internal_state);
 							break;
 
 						default:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-11");
+
 							main_ret = TRANSITION_DENIED;
 							mavlink_log_critical(&mavlink_log_pub, "Unsupported auto mode");
 							break;
@@ -701,18 +715,26 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 					}
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_ACRO) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-12");
+
 					/* ACRO */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_ACRO, status_flags, &internal_state);
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_RATTITUDE) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-13");
+
 					/* RATTITUDE */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_RATTITUDE, status_flags, &internal_state);
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_STABILIZED) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-14");
+
 					/* STABILIZED */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_STAB, status_flags, &internal_state);
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_OFFBOARD) {
+					PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-15");
+
 					reset_posvel_validity(changed);
 					/* OFFBOARD */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_OFFBOARD, status_flags, &internal_state);
@@ -721,20 +743,28 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 			} else {
 				/* use base mode */
 				if (base_mode & VEHICLE_MODE_FLAG_AUTO_ENABLED) {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-16");
+
 					/* AUTO */
 					main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_MISSION, status_flags,
 									 &internal_state);
 
 				} else if (base_mode & VEHICLE_MODE_FLAG_MANUAL_INPUT_ENABLED) {
 					if (base_mode & VEHICLE_MODE_FLAG_GUIDED_ENABLED) {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-17");
+
 						/* POSCTL */
 						main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_POSCTL, status_flags, &internal_state);
 
 					} else if (base_mode & VEHICLE_MODE_FLAG_STABILIZE_ENABLED) {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-18");
+
 						/* STABILIZED */
 						main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_STAB, status_flags, &internal_state);
 
 					} else {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-19");
+
 						/* MANUAL */
 						main_ret = main_state_transition(*status_local, commander_state_s::MAIN_STATE_MANUAL, status_flags, &internal_state);
 					}
@@ -742,9 +772,13 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 			}
 
 			if ((arming_ret != TRANSITION_DENIED) && (main_ret != TRANSITION_DENIED)) {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-20");
+
 				cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
 
 			} else {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-21");
+
 				cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;
 
 				if (arming_ret == TRANSITION_DENIED) {
@@ -755,6 +789,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-22");
 
 			// Adhere to MAVLink specs, but base on knowledge that these fundamentally encode ints
 			// for logic state parameters
@@ -812,6 +847,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-23");
+
 			if (cmd.param1 > 1.5f) {
 				armed_local->lockdown = true;
 				warnx("forcing lockdown (motors off)");
@@ -837,6 +874,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_DO_SET_HOME: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-24");
+
 			bool use_current = cmd.param1 > 0.5f;
 
 			if (use_current) {
@@ -892,9 +931,12 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_GUIDED_ENABLE: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-25");
+
 			transition_result_t res = TRANSITION_DENIED;
 			static main_state_t main_state_pre_offboard = commander_state_s::MAIN_STATE_MANUAL;
 
+			PX4_WARN("Varan Varvaran-5");
 			if (internal_state.main_state != commander_state_s::MAIN_STATE_OFFBOARD) {
 				main_state_pre_offboard = internal_state.main_state;
 			}
@@ -928,6 +970,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_RETURN_TO_LAUNCH: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-26");
+
 			/* switch to RTL which ends the mission */
 			if (TRANSITION_CHANGED == main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_RTL, status_flags,
 					&internal_state)) {
@@ -942,6 +986,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF: {
+			PX4_WARN("Varan Varvaran-6");
 			/* ok, home set, use it to take off */
 			if (TRANSITION_CHANGED == main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_TAKEOFF, status_flags,
 					&internal_state)) {
@@ -958,6 +1003,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_LAND: {
+			PX4_WARN("Varan Varvaran-7");
 			if (TRANSITION_CHANGED == main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_LAND, status_flags,
 					&internal_state)) {
 				mavlink_and_console_log_info(&mavlink_log_pub, "Landing at current position");
@@ -971,6 +1017,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_PRECLAND: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-27");
+
 			if (TRANSITION_CHANGED == main_state_transition(*status_local, commander_state_s::MAIN_STATE_AUTO_PRECLAND,
 					status_flags, &internal_state)) {
 				mavlink_and_console_log_info(&mavlink_log_pub, "Precision landing");
@@ -984,7 +1032,7 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_MISSION_START: {
-
+			PX4_WARN("Varan Varvaran-8");
 			cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_DENIED;
 
 			// check if current mission and first item are valid
@@ -1013,6 +1061,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_CONTROL_HIGH_LATENCY: {
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-28");
+
 			// if no high latency telemetry exists send a failed acknowledge
 			if (_high_latency_datalink_heartbeat > commander_boot_timestamp) {
 				cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_FAILED;
@@ -1022,6 +1072,8 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		break;
 
 	case vehicle_command_s::VEHICLE_CMD_DO_ORBIT:
+							PX4_WARN("Varan Varvaran-VEHICLE_CMD_DO_SET_MODE-29");
+
 		// Switch to orbit state and let the orbit task handle the command further
 		main_state_transition(*status_local, commander_state_s::MAIN_STATE_ORBIT, status_flags, &internal_state);
 		break;
