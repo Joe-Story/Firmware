@@ -58,6 +58,8 @@
 #include <px4_tasks.h>
 #include <systemlib/mavlink_log.h>
 
+int navigator_iterator = 0;
+
 /**
  * navigator app start / stop handling function
  *
@@ -466,6 +468,9 @@ Navigator::run()
 		switch (_vstatus.nav_state) {
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
 			_pos_sp_triplet_published_invalid_once = false;
+
+//                        printf("\n Auto mission iteration: %d", navigator_iterator);
+//                        navigator_iterator++;
 
 			_mission.set_execution_mode(mission_result_s::MISSION_EXECUTION_MODE_NORMAL);
 			navigation_mode_new = &_mission;

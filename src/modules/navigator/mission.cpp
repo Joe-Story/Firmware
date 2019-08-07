@@ -59,6 +59,8 @@
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
 
+int mission_iterator = 0;
+
 Mission::Mission(Navigator *navigator) :
 	MissionBlock(navigator),
 	ModuleParams(navigator)
@@ -77,6 +79,8 @@ Mission::on_inactive()
 	if (!_navigator->home_position_valid()) {
 		return;
 	}
+
+        //printf("\n Mission Inactive");
 
 	if (_inited) {
 		if (_mission_sub.updated()) {
@@ -98,6 +102,9 @@ Mission::on_inactive()
 
 		/* load missions from storage */
 		mission_s mission_state = {};
+
+//                printf("\n Load mission iteration: %d", mission_iterator);
+//                mission_iterator++;
 
 		dm_lock(DM_KEY_MISSION_STATE);
 
@@ -136,7 +143,8 @@ Mission::on_inactive()
 void
 Mission::on_inactivation()
 {
-	// Disable camera trigger
+        //printf("\n Mission Inactivation");
+        // Disable camera trigger
 	vehicle_command_s cmd = {};
 	cmd.command = vehicle_command_s::VEHICLE_CMD_DO_TRIGGER_CONTROL;
 	// Pause trigger
@@ -148,7 +156,9 @@ Mission::on_inactivation()
 void
 Mission::on_activation()
 {
-	if (_mission_waypoints_changed) {
+        printf("\nMission Active");
+        printf("\n");
+        if (_mission_waypoints_changed) {
 		// do not set the closest mission item in the normal mission mode
 		if (_mission_execution_mode != mission_result_s::MISSION_EXECUTION_MODE_NORMAL) {
 			_current_mission_index = index_closest_mission_item();
@@ -1400,6 +1410,9 @@ Mission::prepare_mission_items(mission_item_s *mission_item,
 		offset = -1;
 	}
 
+//        printf("\n Prepare Mission Items Iteration: %d", mission_iterator);
+//        mission_iterator++;
+
 	if (read_mission_item(0, mission_item)) {
 
 		first_res = true;
@@ -1434,6 +1447,10 @@ Mission::read_mission_item(int offset, struct mission_item_s *mission_item)
 
 	int *mission_index_ptr = (offset == 0) ? &_current_mission_index : &index_to_read;
 	const dm_item_t dm_item = (dm_item_t)_mission.dataman_id;
+
+
+        //printf("\n Read mission iteration: %d", mission_iterator);
+        //mission_iterator++;
 
 	/* do not work on empty missions */
 	if (_mission.count == 0) {
@@ -1508,6 +1525,8 @@ Mission::read_mission_item(int offset, struct mission_item_s *mission_item)
 		} else {
 			/* if it's not a DO_JUMP, then we were successful */
 			memcpy(mission_item, &mission_item_tmp, sizeof(struct mission_item_s));
+//                        printf("\n memcopy: %d", mission_iterator);
+//                        mission_iterator++;
 			return true;
 		}
 	}
@@ -1606,7 +1625,116 @@ Mission::check_mission_valid(bool force)
 {
 	if ((!_home_inited && _navigator->home_position_valid()) || force) {
 
-		MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
+                MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
+                PX4_INFO("Check Mission Valid");
+
+                const mission_s &mission = _mission;
+                /***  INSERT MISSION PLANNING CODE HERE  ***/
+                size_t numItems = mission.count;
+                printf("\nMission Count is: %d", numItems);
+                printf("\n");
+                struct mission_item_s item_list[numItems];
+
+                int t = 0;
+                for (size_t i = 0; i < numItems; i++){
+
+                    printf("\nIterator loop: %d", i);
+                    struct mission_item_s mission_item {};
+                    if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+                        /* error reading, mission is invalid */
+                        mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                        return;
+                    }
+
+                    item_list[i] = mission_item;
+
+//                    item_list[i].lat = mission_item.lat;
+//                    item_list[i].lon = mission_item.lon;
+
+//                    item_list[i].acceptance_radius;
+//                    item_list[i].altitude;
+//                    item_list[i].altitude_is_relative;
+//                    item_list[i].autocontinue;
+//                    item_list[i].circle_radius;
+//                    item_list[i].do_jump_current_count;
+//                    item_list[i].do_jump_mission_index;
+//                    item_list[i].do_jump_repeat_count;
+//                    item_list[i].force_heading;
+//                    item_list[i].frame;
+//                    item_list[i].land_precision;
+//                    item_list[i].loiter_exit_xtrack;
+//                    item_list[i].loiter_radius;
+//                    item_list[i].nav_cmd;
+//                    item_list[i].origin;
+//                    item_list[i].params;
+//                    item_list[i].pitch_min;
+//                    item_list[i].time_inside;
+//                    item_list[i].vertex_count;
+//                    item_list[i].vtol_back_transition;
+//                    item_list[i].yaw;
+//                    item_list[i]._padding0;
+//                    item_list[i]._padding1;
+//                    item_list[i].___lat_float;
+//                    item_list[i].___lon_float;
+
+
+
+                    /* check only items with valid lat/lon */
+                    if (!MissionBlock::item_contains_position(mission_item)) {
+                        continue;
+                    }
+
+                    if (MissionBlock::item_contains_position(mission_item)){
+                        item_list[t].lat = mission_item.lat;
+                        item_list[t].lon = mission_item.lon;
+                        t++;
+                    }
+                }
+
+                int x = 0;
+                for (size_t i = 0; i < numItems; i++){
+                    printf("\nItem %d: ", x);
+                    printf("\n%f", item_list[i].lat);
+                    printf("\n%f", item_list[i].lon);
+                    printf("\n%d", item_list[i].nav_cmd);
+                    //printf("\n%lf", item_list[i].loiter_radius);
+//                    printf("acceptance radius: %f, "
+//                           "altitude: %f, "
+//                           "altitude is relative: %u, "
+//                           "autocontinue: %u, "
+//                           "circle radius: %d, "
+//                           "do jump current count: %d, "
+//                           "do jump mission index: %d, "
+//                           "do jump repeat count: %d, "
+//                           "force heading: %d, "
+//                           "frame: %d, "
+//                           "land precision: %d, "
+//                           "lat: %f, "
+//                           "loiter_exit_xtrack: %d, "
+//                           "loiter radius: %d, "
+//                           "lon: %f, "
+//                           "nav cmd: %d, "
+//                           "origin: %d, "
+//                           "params: %d, "
+//                           "pitch min: %d, "
+//                           "time inside: %d, "
+//                           "vertex count: %d"
+//                           "vtol back transition: %d"
+//                           "yaw: %d"
+//                           "_padding0: %d"
+//                           "_padding1: %d"
+//                           "___lat float: %d"
+//                           "___lon float: %d",
+//                           item_list[x].acceptance_radius, item_list[x].altitude, item_list[x].altitude_is_relative, item_list[x].autocontinue, item_list[x].circle_radius, item_list[x].do_jump_current_count, item_list[x].do_jump_mission_index, item_list[x].do_jump_repeat_count, item_list[x].force_heading, item_list[x].frame, item_list[x].land_precision, item_list[x].lat, item_list[x].loiter_exit_xtrack, item_list[x].loiter_radius, item_list[x].lon, item_list[x].nav_cmd, item_list[x].origin, item_list[x].params, item_list[x].pitch_min, item_list[x].time_inside, item_list[x].vertex_count, item_list[x].vtol_back_transition, item_list[x].yaw, item_list[x]._padding0, item_list[x]._padding1, item_list[x].___lat_float, item_list[x].___lon_float);
+                    x++;
+                }
+
+//                for (int i = 0; i < t; i=i+2){
+//                    printf("\nLatitude %d: %f", i, item_list[i].lat);
+//                    printf("\nLongitude %d: %f", i, item_list[i].lon);
+//                }
+
+                /***  END INSERTED CODE  ***/
 
 		_navigator->get_mission_result()->valid =
 			_missionFeasibilityChecker.checkMissionFeasible(_mission,
@@ -1621,7 +1749,8 @@ Mission::check_mission_valid(bool force)
 
 		// find and store landing start marker (if available)
 		find_mission_land_start();
-	}
+
+    }
 }
 
 void
