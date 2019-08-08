@@ -436,7 +436,7 @@ Mission::find_mission_land_start()
 
 		if (dm_read(dm_current, i, &missionitem, len) != len) {
 			/* not supposed to happen unless the datamanager can't access the SD card, etc. */
-			PX4_ERR("dataman read failure");
+			PX4_ERR("dataman read failure-1 dm_current %d",(int) dm_current);
 			break;
 		}
 
@@ -587,7 +587,7 @@ Mission::advance_mission()
 
 					if (dm_read(dm_current, i, &missionitem, len) != len) {
 						/* not supposed to happen unless the datamanager can't access the SD card, etc. */
-						PX4_ERR("dataman read failure");
+						PX4_ERR("dataman read failure-2");
 						break;
 					}
 
@@ -1673,13 +1673,13 @@ Mission::check_mission_valid(bool force)
 
                 mission_s mission = _mission;
                 /***  INSERT MISSION PLANNING CODE HERE  ***/
-                size_t numItems = mission.count;
+                int numItems = mission.count;
                 printf("Mission Count is: %d\n", numItems);
 
 		//struct mission_item_s uploadedWpsList[numItems];
                 int waypointsCnt = 0;
                 numOfWaypoints = 0;
-                for (size_t i = 0; i < numItems; i++){
+                for (int i = 0; i < numItems; i++){
                     struct mission_item_s mission_item {};
                     if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
                         /* error reading, mission is invalid */
@@ -1819,31 +1819,47 @@ Mission::check_mission_valid(bool force)
 			if (!write_failed) {
 				PX4_WARN("My Write failed\n");
 				printf("Tried to write index %d: with original index %d\n", waypointsCnt-1-waypointsIndex, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
+                        }
+
+			//for (auto i = uploadedWpsList.begin(); i != uploadedWpsList.end(); ++i) (dm_item_t)mission.dataman_id
+			dm_lock(DM_KEY_MISSION_STATE);
+                        for (int t = 0; t < waypointsCnt; t++){
+				/* Reverse waypoints */
+				write_failed = dm_write((dm_item_t)mission.dataman_id, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex,
+						DM_PERSIST_POWER_ON_RESET, &uploadedWpsList[i].waypoint,
+						sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
+
+				if (write_failed) {
+					PX4_WARN("My Write failed");
+					printf("Tried to write index %d: with original index %d\n", waypointsCnt-1-waypointsIndex, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
+				}
+
+				waypointsIndex++;
 			}
+			dm_unlock(DM_KEY_MISSION_STATE);
 
-			waypointsIndex++;
+			/* Check updated trajectory */
+			printf("\nUpdated trajectory:\n");
+			waypointsIndex = 0;
+			//for (int i = 0; i < waypointsCnt; i++){
+                        for (int t = 0; t < numItems; t++){
+				struct mission_item_s mission_item {};
+
+				if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+					/* error reading, mission is invalid */
+					mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+					return;
+				}
+
+				/* check only items with valid lat/lon */
+				if (!MissionBlock::item_contains_position(mission_item)) {
+					continue;
+				} else {
+					printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n", waypointsIndex, mission_item.lat, mission_item.lon, mission_item.nav_cmd);
+					waypointsIndex++;
+				}
+			}
 		}
-
-		/* Check updated trajectory */
-		printf("Updated trajectory:\n");
-		waypointsIndex = 0;
-		for (size_t i = 0; i < numItems; i++){
-                    struct mission_item_s mission_item {};
-                    if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
-                        /* error reading, mission is invalid */
-                        mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
-                        return;
-                    }
-
-                    /* check only items with valid lat/lon */
-                    if (!MissionBlock::item_contains_position(mission_item)) {
-                        continue;
-                    } else {
-			printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n", waypointsIndex, mission_item.lat, mission_item.lon, mission_item.nav_cmd);
-		    	waypointsIndex++;
-		    }
-                }
-
                 /***  END INSERTED CODE  ***/
 
 		_navigator->get_mission_result()->valid =
@@ -1859,6 +1875,40 @@ Mission::check_mission_valid(bool force)
 
 		// find and store landing start marker (if available)
 		find_mission_land_start();
+
+                //		if (numItems > 0) {
+                //			//struct mission_item_s uploadedWpsList[numItems];
+                //			int waypointsCnt = 0;
+                //			for (int i = 0; i < numItems; i++){
+                //				struct mission_item_s mission_item {};
+                //				if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+                //					/* error reading, mission is invalid */
+                //					mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                //					return;
+                //				}
+
+                //				/* check only items with valid lat/lon */
+                //				if (!MissionBlock::item_contains_position(mission_item)) {
+                //					continue;
+                //				} else {
+                //					oneWaypoint.waypoint = mission_item;
+                //					oneWaypoint.originalIndex = i;
+                //					waypointsCnt++;
+
+                //					uploadedWpsList.push_back(oneWaypoint);
+                //					//uploadedWpsList[waypointsCnt++] = mission_item;
+                //				}
+                //                      }
+
+                //			printf("waypointsCnt is: %d\n", waypointsCnt);
+
+                //			for (int i = 0; i < waypointsCnt; i++){
+                //				printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
+                //					i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, uploadedWpsList[i].waypoint.nav_cmd);
+                //			}
+
+                //			int waypointsIndex = 0;
+                //			bool write_failed = false;
 
     }
 }
@@ -1908,6 +1958,8 @@ Mission::reset_mission(struct mission_s &mission)
 		}
 
 		dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
+	} else {
+		PX4_ERR("dm_read error");
 	}
 
 	dm_unlock(DM_KEY_MISSION_STATE);
@@ -1954,7 +2006,7 @@ Mission::index_closest_mission_item() const
 
 		if (dm_read(dm_current, i, &missionitem, len) != len) {
 			/* not supposed to happen unless the datamanager can't access the SD card, etc. */
-			PX4_ERR("dataman read failure");
+			PX4_ERR("dataman read failure-3");
 			break;
 		}
 
