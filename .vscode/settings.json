@@ -76,7 +76,8 @@
         "files.trimTrailingWhitespace": true,
         "git.detectSubmodulesLimit": 20,
         "files.associations": {
-                "*.jinja": "jinja"
+                "*.jinja": "jinja",
+                "*.tcc": "cpp"
         },
         "search.exclude": {
                 "build/**": true

@@ -414,6 +414,7 @@ enqueue_work_item_and_wait_for_result(work_q_item_t *item)
 
 	destroy_work_item(item);
 
+	//PX4_WARN("Enqueue result is %d\n",result);
 	return result;
 }
 
@@ -1083,10 +1084,12 @@ dm_write(dm_item_t item, unsigned index, dm_persitence_t persistence, const void
 	/* Make sure data manager has been started and is not shutting down */
 	if (!is_running() || g_task_should_exit) {
 		return -1;
+		PX4_WARN("Fail no 1\n");
 	}
 
 	/* get a work item and queue up a write request */
 	if ((work = create_work_item()) == nullptr) {
+		PX4_WARN("Fail no 2\n");
 		return -1;
 	}
 

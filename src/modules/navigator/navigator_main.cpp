@@ -358,7 +358,6 @@ Navigator::run()
 					}
 				}
 
-				PX4_WARN("Varan Varvaran");
 				// CMD_MISSION_START is acknowledged by commander
 
 			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_CHANGE_SPEED) {
@@ -468,8 +467,6 @@ Navigator::run()
 
 		switch (_vstatus.nav_state) {
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
-			//PX4_WARN("Varan Varvaran-2");
-
 			_pos_sp_triplet_published_invalid_once = false;
 
 //                        printf("\n Auto mission iteration: %d", navigator_iterator);
@@ -513,7 +510,6 @@ Navigator::run()
 					break;
 
 				case RTL::RTL_MISSION:
-					PX4_WARN("Varan Varvaran-3");
 					if (_mission.get_land_start_available() && !get_land_detected()->landed) {
 						// the mission contains a landing spot
 						_mission.set_execution_mode(mission_result_s::MISSION_EXECUTION_MODE_FAST_FORWARD);
@@ -583,7 +579,6 @@ Navigator::run()
 			}
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
-			PX4_WARN("Varan Varvaran-4");
 			_pos_sp_triplet_published_invalid_once = false;
 			navigation_mode_new = &_takeoff;
 			break;

@@ -59,6 +59,10 @@
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
 
+#include <vector>
+
+using namespace std;
+
 int mission_iterator = 0;
 
 Mission::Mission(Navigator *navigator) :
@@ -1624,21 +1628,25 @@ void
 Mission::check_mission_valid(bool force)
 {
 	if ((!_home_inited && _navigator->home_position_valid()) || force) {
+		typedef struct mission_waypoint_struct {
+			mission_item_s waypoint;
+			int originalIndex;
+		} mission_waypoint_t;
+
+		mission_waypoint_t oneWaypoint;
+		vector<mission_waypoint_t> uploadedWpsList;
 
                 MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
-                PX4_INFO("Check Mission Valid");
+                PX4_INFO("Check Mission Valid\n");
 
-                const mission_s &mission = _mission;
+                mission_s mission = _mission;
                 /***  INSERT MISSION PLANNING CODE HERE  ***/
                 size_t numItems = mission.count;
-                printf("\nMission Count is: %d", numItems);
-                printf("\n");
-                struct mission_item_s item_list[numItems];
+                printf("Mission Count is: %d\n", numItems);
 
-                int t = 0;
+		//struct mission_item_s uploadedWpsList[numItems];
+                int waypointsCnt = 0;
                 for (size_t i = 0; i < numItems; i++){
-
-                    printf("\nIterator loop: %d", i);
                     struct mission_item_s mission_item {};
                     if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
                         /* error reading, mission is invalid */
@@ -1646,93 +1654,64 @@ Mission::check_mission_valid(bool force)
                         return;
                     }
 
-                    item_list[i] = mission_item;
+                    /* check only items with valid lat/lon */
+                    if (!MissionBlock::item_contains_position(mission_item)) {
+                        continue;
+                    } else {
+			oneWaypoint.waypoint = mission_item;
+			oneWaypoint.originalIndex = i;
+			waypointsCnt++;
 
-//                    item_list[i].lat = mission_item.lat;
-//                    item_list[i].lon = mission_item.lon;
+			uploadedWpsList.push_back(oneWaypoint);
+			//uploadedWpsList[waypointsCnt++] = mission_item;
+		    }
+                }
 
-//                    item_list[i].acceptance_radius;
-//                    item_list[i].altitude;
-//                    item_list[i].altitude_is_relative;
-//                    item_list[i].autocontinue;
-//                    item_list[i].circle_radius;
-//                    item_list[i].do_jump_current_count;
-//                    item_list[i].do_jump_mission_index;
-//                    item_list[i].do_jump_repeat_count;
-//                    item_list[i].force_heading;
-//                    item_list[i].frame;
-//                    item_list[i].land_precision;
-//                    item_list[i].loiter_exit_xtrack;
-//                    item_list[i].loiter_radius;
-//                    item_list[i].nav_cmd;
-//                    item_list[i].origin;
-//                    item_list[i].params;
-//                    item_list[i].pitch_min;
-//                    item_list[i].time_inside;
-//                    item_list[i].vertex_count;
-//                    item_list[i].vtol_back_transition;
-//                    item_list[i].yaw;
-//                    item_list[i]._padding0;
-//                    item_list[i]._padding1;
-//                    item_list[i].___lat_float;
-//                    item_list[i].___lon_float;
+		printf("waypointsCnt is: %d\n", waypointsCnt);
 
 
+                for (int i = 0; i < waypointsCnt; i++){
+                    printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
+		    	i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, uploadedWpsList[i].waypoint.nav_cmd);
+                }
+
+		bool write_failed = false;
+		int waypointsIndex = 0;
+
+		//for (auto i = uploadedWpsList.begin(); i != uploadedWpsList.end(); ++i)
+		for (int i = 0; i < waypointsCnt; i++){
+			/* Reverse waypoints */
+			write_failed = dm_write((dm_item_t)mission.dataman_id, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex,
+					DM_PERSIST_POWER_ON_RESET, &uploadedWpsList[waypointsCnt-1-waypointsIndex].waypoint,
+					sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
+
+			if (!write_failed) {
+				PX4_WARN("My Write failed\n");
+				printf("Tried to write index %d: with original index %d\n", waypointsCnt-1-waypointsIndex, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
+			}
+
+			waypointsIndex++;
+		}
+
+		/* Check updated trajectory */
+		printf("Updated trajectory:\n");
+		waypointsIndex = 0;
+		for (size_t i = 0; i < numItems; i++){
+                    struct mission_item_s mission_item {};
+                    if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+                        /* error reading, mission is invalid */
+                        mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                        return;
+                    }
 
                     /* check only items with valid lat/lon */
                     if (!MissionBlock::item_contains_position(mission_item)) {
                         continue;
-                    }
-
-                    if (MissionBlock::item_contains_position(mission_item)){
-                        item_list[t].lat = mission_item.lat;
-                        item_list[t].lon = mission_item.lon;
-                        t++;
-                    }
+                    } else {
+			printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n", waypointsIndex, mission_item.lat, mission_item.lon, mission_item.nav_cmd);
+		    	waypointsIndex++;
+		    }
                 }
-
-                int x = 0;
-                for (size_t i = 0; i < numItems; i++){
-                    printf("\nItem %d: ", x);
-                    printf("\n%f", item_list[i].lat);
-                    printf("\n%f", item_list[i].lon);
-                    printf("\n%d", item_list[i].nav_cmd);
-                    //printf("\n%lf", item_list[i].loiter_radius);
-//                    printf("acceptance radius: %f, "
-//                           "altitude: %f, "
-//                           "altitude is relative: %u, "
-//                           "autocontinue: %u, "
-//                           "circle radius: %d, "
-//                           "do jump current count: %d, "
-//                           "do jump mission index: %d, "
-//                           "do jump repeat count: %d, "
-//                           "force heading: %d, "
-//                           "frame: %d, "
-//                           "land precision: %d, "
-//                           "lat: %f, "
-//                           "loiter_exit_xtrack: %d, "
-//                           "loiter radius: %d, "
-//                           "lon: %f, "
-//                           "nav cmd: %d, "
-//                           "origin: %d, "
-//                           "params: %d, "
-//                           "pitch min: %d, "
-//                           "time inside: %d, "
-//                           "vertex count: %d"
-//                           "vtol back transition: %d"
-//                           "yaw: %d"
-//                           "_padding0: %d"
-//                           "_padding1: %d"
-//                           "___lat float: %d"
-//                           "___lon float: %d",
-//                           item_list[x].acceptance_radius, item_list[x].altitude, item_list[x].altitude_is_relative, item_list[x].autocontinue, item_list[x].circle_radius, item_list[x].do_jump_current_count, item_list[x].do_jump_mission_index, item_list[x].do_jump_repeat_count, item_list[x].force_heading, item_list[x].frame, item_list[x].land_precision, item_list[x].lat, item_list[x].loiter_exit_xtrack, item_list[x].loiter_radius, item_list[x].lon, item_list[x].nav_cmd, item_list[x].origin, item_list[x].params, item_list[x].pitch_min, item_list[x].time_inside, item_list[x].vertex_count, item_list[x].vtol_back_transition, item_list[x].yaw, item_list[x]._padding0, item_list[x]._padding1, item_list[x].___lat_float, item_list[x].___lon_float);
-                    x++;
-                }
-
-//                for (int i = 0; i < t; i=i+2){
-//                    printf("\nLatitude %d: %f", i, item_list[i].lat);
-//                    printf("\nLongitude %d: %f", i, item_list[i].lon);
-//                }
 
                 /***  END INSERTED CODE  ***/
 
