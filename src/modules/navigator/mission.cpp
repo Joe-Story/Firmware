@@ -63,7 +63,39 @@
 
 using namespace std;
 
+/*** SETUP FOR COST CALCULATOR CODE ***/
+
+#include <functional>
+#include <future>
+#include <memory>
+#include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <new>
+#include <iomanip>
+#include <stdio.h>
+#include <stdlib.h>
+//Some of these may not be necessary
+
+using namespace std::placeholders; //IS THIS NECESSARY?
+using namespace std::chrono; // for seconds(), milliseconds()
+using namespace std::this_thread; // for sleep_for()
+
+//Declare cost function vairables and class objects
 int mission_iterator = 0;
+double cost = 0;
+int n=0;
+int numOfWaypoints; //PROBABLY NOT NEEDED
+WAYPOINTS waypoints;
+DRONE drone;
+TRAJECTORY trajectory;
+
+//Declare dynamic arrays
+WAYPOINTS * route_array;
+WAYPOINTS * waypoint_array;
+double ** cost_array;
+
+/*** END OF SETUP ***/
 
 Mission::Mission(Navigator *navigator) :
 	MissionBlock(navigator),
@@ -1646,6 +1678,7 @@ Mission::check_mission_valid(bool force)
 
 		//struct mission_item_s uploadedWpsList[numItems];
                 int waypointsCnt = 0;
+                numOfWaypoints = 0;
                 for (size_t i = 0; i < numItems; i++){
                     struct mission_item_s mission_item {};
                     if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
@@ -1658,16 +1691,21 @@ Mission::check_mission_valid(bool force)
                     if (!MissionBlock::item_contains_position(mission_item)) {
                         continue;
                     } else {
-			oneWaypoint.waypoint = mission_item;
-			oneWaypoint.originalIndex = i;
-			waypointsCnt++;
+                        oneWaypoint.waypoint = mission_item;
+                        oneWaypoint.originalIndex = i;
 
-			uploadedWpsList.push_back(oneWaypoint);
+                        if (oneWaypoint.waypoint.nav_cmd == 16){
+                            uploadedWpsList.push_back(oneWaypoint);
+                            waypointsCnt++;
+                            numOfWaypoints++;
+                        }
+
 			//uploadedWpsList[waypointsCnt++] = mission_item;
 		    }
                 }
-
+                numOfWaypoints--; //Subtract 1 from the total as the home destination is sent as the final waypoint
 		printf("waypointsCnt is: %d\n", waypointsCnt);
+                printf("Num of Waypoints is: %d\n", numOfWaypoints);
 
 
                 for (int i = 0; i < waypointsCnt; i++){
@@ -1677,6 +1715,99 @@ Mission::check_mission_valid(bool force)
 
 		bool write_failed = false;
 		int waypointsIndex = 0;
+
+
+                /*** Collate the information needed to create a trajectory ***/
+                //Get Drone Information
+                /* Insert code here */
+
+                //Declare all dynamic arrays
+                waypoint_array = new WAYPOINTS [numOfWaypoints+2];
+                route_array = new WAYPOINTS [numOfWaypoints+2];
+
+                //Create the 2D dynamic cost array
+                cost_array = new double * [numOfWaypoints+2];
+                for (int i=0; i < numOfWaypoints+1; i++){
+                    cost_array[i] = new double [numOfWaypoints+2];
+                }
+
+                /*** CHANGE THIS FROM MAVSDK SCRIPT ***/
+                /*** IMPROVE BY TAKING HOME POSITION FROM LIVE DATA ***/
+
+                //Update takeoff and land position
+                waypoint_array[0].id = 0;
+                waypoint_array[0].user = "Takeoff";
+//                waypoint_array[0].lat = ;
+                waypoint_array[0].lat = uploadedWpsList[numOfWaypoints].waypoint.lat;
+//                waypoint_array[0].lon = ;
+                waypoint_array[0].lon = uploadedWpsList[numOfWaypoints].waypoint.lon;
+                waypoint_array[0].alt = 10.0;
+                //waypoint_array[0].alt = uploadedWPSList[numOfWaypoints].waypoint.alt;
+                waypoint_array[0].speed = 5.0f;
+
+                //Set the last point as the home position
+                waypoint_array[numOfWaypoints+1]=waypoint_array[0];
+
+                for (int i = 1; i < numOfWaypoints+1; i++){
+                    waypoint_array[i].id = i;
+                    waypoint_array[i].user = "Unkown";
+                    waypoint_array[i].lat = uploadedWpsList[i].waypoint.lat;
+                    waypoint_array[i].lon = uploadedWpsList[i].waypoint.lon;
+                    waypoint_array[i].alt = 10.0;
+                    waypoint_array[i].speed = 5.0;
+                    waypoint_array[i].deadline = 10;
+                    waypoint_array[i].payload = 0.2;
+                }
+
+                //Set the starting payload
+                for (int i=1; i<numOfWaypoints+1; i++){
+                    waypoint_array[0].payload += waypoint_array[i].payload;
+                }
+
+                //Print
+                std::cout << "" << std::endl;
+                for (int i=0; i<numOfWaypoints+2;i++) {
+                    std::cout << "Waypoint " << waypoint_array[i].id << ": "
+                              << waypoint_array[i].user << ", "
+                              << std::setprecision(8) << waypoint_array[i].lat << ", "
+                              << std::setprecision(8) << waypoint_array[i].lon << ", "
+                              << std::setprecision(2) << waypoint_array[i].alt << ", "
+                              << waypoint_array[i].speed << ", "
+                              << waypoint_array[i].deadline << ", "
+                              << waypoint_array[i].payload << std::endl;
+                }
+                std::cout << "" << std::endl;
+
+                std::cout.precision(5);
+
+                /*** Attempt to calculate a minimum cost trajectory ***/
+
+                //Calculate the 2D time array (spherical polar coordinates)
+                std::cout << "This program minimises the number of missed deadlines" << std::endl;
+                std::cout << "" << std::endl;
+                cost_array = trajectory.calc_cost(numOfWaypoints, waypoint_array);
+
+                //Calculating mission plan
+                std::cout << "Calculating best flight path:" << std::endl;
+                std::cout << "" << std::endl;
+               //std::cout << cost << std::endl;
+                cost = trajectory.call_mincost(waypoint_array, numOfWaypoints, route_array, cost_array);
+                cost += 3*numOfWaypoints;
+                std::cout << "\n\nMinimum cost is " << cost << " seconds" << std::endl;
+                std::cout << "" << std::endl;
+
+                for (int i=0; i<numOfWaypoints+1;i++) {
+                    std::cout << "Waypoint " << std::setprecision(8) << route_array[i].id << ", "
+                    << route_array[i].lat << std::endl;
+                }
+
+                //Ensure the flight time is within the maximum possible flight time
+//                float max_flight_time = drone.calc_max_flight_time();
+//                if ((cost/60) >= max_flight_time){
+//                    std::cout << "ERROR: Maximum flight time has been exceeded!" << std::endl;
+//                    return 1;
+//                }
+
 
 		//for (auto i = uploadedWpsList.begin(); i != uploadedWpsList.end(); ++i)
 		for (int i = 0; i < waypointsCnt; i++){
