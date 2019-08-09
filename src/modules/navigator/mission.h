@@ -71,6 +71,13 @@
 #include <cmath>
 #include <iostream>
 #include <tuple>
+#include <vector>
+
+typedef struct mission_waypoint_struct {
+        mission_item_s waypoint;
+        int originalIndex;
+} mission_waypoint_t;
+
 
 const double earth_radius = 6371000; //metres;
 const double pi = 3.1415926;
@@ -112,6 +119,7 @@ class WAYPOINTS{
     int deadline;
     int numOfWaypoints;
     double payload;
+    int original_index;
 
 
     /*** Waypoint trajectory functions ***/
@@ -136,9 +144,10 @@ class WAYPOINTS{
 class TRAJECTORY{
     public:
         //Calculates a 2D cost array based on the cost function used
-        double** calc_cost(int num_waypoints, WAYPOINTS array[]){
+        double** calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array){
             WAYPOINTS cost_object;
             double ** cost2d;
+            double speed = 5.0;
             cost2d = new double * [num_waypoints+2];
 
             for (int i=0; i < num_waypoints+1; i++){
@@ -147,7 +156,7 @@ class TRAJECTORY{
 
             for (int i = 0; i < num_waypoints+1; i++){
                 for (int t = 0; t < num_waypoints+1; t++){
-                    cost2d[i][t] = cost_object.time(array[i].alt, array[t].alt, array[i].lat, array[t].lat, array[i].lon, array[t].lon, array[t].speed);
+                    cost2d[i][t] = cost_object.time(array[i].waypoint.altitude, array[t].waypoint.altitude, array[i].waypoint.lat, array[t].waypoint.lat, array[i].waypoint.lon, array[t].waypoint.lon, speed);
                 }
             }
 
@@ -167,12 +176,12 @@ class TRAJECTORY{
         }
 
         //Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
-        double call_mincost(WAYPOINTS array[], int num_waypoints, WAYPOINTS route_array[], double ** cost_array){
+        std::tuple<double, std::vector<mission_waypoint_t>> call_mincost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList, double ** cost_array){
             double cost = 0;
             int n = 0;
             int completed[num_waypoints+1] = {0};
 
-            return TRAJECTORY::mincost(0, array, num_waypoints, cost, completed, route_array, cost_array, n);
+            return TRAJECTORY::mincost(0, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n);
 
         }
 
@@ -210,7 +219,7 @@ class TRAJECTORY{
         }
 
         //Finds a close to optimal route using the 'Greedy' method
-        double mincost(int position, WAYPOINTS array[], int num_waypoints, double cost, int completed[], WAYPOINTS route_array[], double ** cost_array, int n){
+        std::tuple <double, std::vector<mission_waypoint_t>> mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n){
             int nposition;
             bool is_final = false;
 
@@ -218,7 +227,7 @@ class TRAJECTORY{
 
             std::cout << position << "--->";
 
-            route_array[n] = array[position];
+            finalWpsList.at(n) = uploadedWpsList[position];
             n++;
 
             //nposition = least(position, num_waypoints);
@@ -228,10 +237,10 @@ class TRAJECTORY{
                 nposition=0;
                 std::cout << nposition;
                 cost+=cost_array[position][nposition];
-                return cost;
+                return {cost, finalWpsList};
             }
 
-            return mincost(nposition, array, num_waypoints, cost, completed, route_array, cost_array, n);
+            return mincost(nposition, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n);
         }
 
 };

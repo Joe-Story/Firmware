@@ -59,8 +59,6 @@
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
 
-#include <vector>
-
 using namespace std;
 
 /*** SETUP FOR COST CALCULATOR CODE ***/
@@ -75,6 +73,7 @@ using namespace std;
 #include <iomanip>
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 //Some of these may not be necessary
 
 using namespace std::placeholders; //IS THIS NECESSARY?
@@ -85,14 +84,11 @@ using namespace std::this_thread; // for sleep_for()
 int mission_iterator = 0;
 double cost = 0;
 int n=0;
-int numOfWaypoints; //PROBABLY NOT NEEDED
-WAYPOINTS waypoints;
+int numOfWaypoints;
 DRONE drone;
 TRAJECTORY trajectory;
 
-//Declare dynamic arrays
-WAYPOINTS * route_array;
-WAYPOINTS * waypoint_array;
+//Declare dynamic cost array
 double ** cost_array;
 
 /*** END OF SETUP ***/
@@ -1660,207 +1656,151 @@ void
 Mission::check_mission_valid(bool force)
 {
 	if ((!_home_inited && _navigator->home_position_valid()) || force) {
-		typedef struct mission_waypoint_struct {
-			mission_item_s waypoint;
-			int originalIndex;
-		} mission_waypoint_t;
-
-		mission_waypoint_t oneWaypoint;
-		vector<mission_waypoint_t> uploadedWpsList;
 
                 MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
                 PX4_INFO("Check Mission Valid\n");
 
-                mission_s mission = _mission;
                 /***  INSERT MISSION PLANNING CODE HERE  ***/
+
+                //Create vectors to contain the PX4 waypoint structure
+                vector<mission_waypoint_t> uploadedWpsList;
+                vector<mission_waypoint_t> finalWpsList;
+                mission_s mission = _mission;
+                mission_waypoint_t oneWaypoint;
                 int numItems = mission.count;
                 printf("Mission Count is: %d\n", numItems);
 
-		//struct mission_item_s uploadedWpsList[numItems];
-                int waypointsCnt = 0;
-                numOfWaypoints = 0;
-                for (int i = 0; i < numItems; i++){
-                    struct mission_item_s mission_item {};
-                    if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
-                        /* error reading, mission is invalid */
-                        mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                if (numItems > 0){
+
+                    /* READ MISSION ITEMS */
+                    numOfWaypoints = 0;
+                    for (int i = 0; i < numItems; i++){
+                        struct mission_item_s mission_item {};
+                        if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+                            /* error reading, mission is invalid */
+                            mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                            return;
+                        }
+
+                        /* check only items with valid lat/lon */
+                        if (!MissionBlock::item_contains_position(mission_item)) {
+                            continue;
+                        } else {
+                            oneWaypoint.waypoint = mission_item;
+                            oneWaypoint.originalIndex = i;
+                            if (oneWaypoint.waypoint.nav_cmd == 16){
+                                uploadedWpsList.push_back(oneWaypoint);
+                                finalWpsList.push_back(oneWaypoint);
+                                numOfWaypoints++;
+                            }
+                        }
+                    }
+
+                    //Check that waypoints have been found
+                    if (numOfWaypoints > 0){
+                        //Subtract 1 from the total as one item is the home position
+                        numOfWaypoints--;
+                    }
+                    else {
+                        PX4_WARN("NO WAYPOINTS FOUND");
                         return;
                     }
 
-                    /* check only items with valid lat/lon */
-                    if (!MissionBlock::item_contains_position(mission_item)) {
-                        continue;
-                    } else {
+                    //Print all of the received information
+                    std::cout.precision(8);
+                    for (int i=0; i < numItems; i++){
+                        std::cout << "Index: " << i << ", Command: " << uploadedWpsList[i].waypoint.nav_cmd << ", Lat: " << uploadedWpsList[i].waypoint.lat << std::endl;
+                    }
+
+                    //Print the number of waypoints received
+                    std::cout << "" << std::endl;
+                    printf("Num of Waypoints is: %d\n", numOfWaypoints);
+
+                    //Print the received waypoints
+                    for (int i = 0; i < numOfWaypoints+1; i++){
+                        printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
+                            i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, uploadedWpsList[i].waypoint.nav_cmd);
+                    }
+
+                    bool write_failed = false;
+
+
+
+                    /*** Collate the information needed to create a trajectory ***/
+
+                    //Get Drone Information
+                    /* INSERT CODE HERE */
+
+                    //Create the 2D dynamic cost array
+                    cost_array = new double * [numOfWaypoints+2];
+                    for (int i=0; i < numOfWaypoints+1; i++){
+                        cost_array[i] = new double [numOfWaypoints+2];
+                    }
+
+                    //Update takeoff and land position using PX4 rather than MAVSDK
+                    /* INSERT CODE HERE */
+
+                    //Set the last point as the home position
+                    /* INSERT CODE HERE */
+
+                    //Set the starting payload
+                    /* INSERT CODE HERE */
+
+                    /*** Attempt to calculate a minimum cost trajectory ***/
+
+                    //Calculate the 2D cost/time array (using spherical polar coordinates)
+                    std::cout << "This program minimises the number of missed deadlines" << std::endl;
+                    std::cout << "" << std::endl;
+                    cost_array = trajectory.calc_cost(numOfWaypoints, uploadedWpsList);
+
+                    //Calculate the optimal trajectory
+                    std::cout << "Calculating best flight path:" << std::endl;
+                    std::cout << "" << std::endl;
+                    std::tie (cost, finalWpsList) = trajectory.call_mincost(uploadedWpsList, numOfWaypoints, finalWpsList, cost_array);
+                    cost += 3*numOfWaypoints;
+                    std::cout << "\n\nMinimum cost is " << cost << " seconds" << std::endl;
+                    std::cout << "" << std::endl;
+
+                    //Print the final trajectory
+                    for (int i = 0; i < numOfWaypoints+1; i++){
+                        printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
+                            i, finalWpsList[i].waypoint.lat, finalWpsList[i].waypoint.lon, finalWpsList[i].waypoint.nav_cmd);
+                    }
+
+                    //Ensure the flight time is within the maximum possible flight time
+                    /* INSERT CODE HERE */
+
+                    //Write the optimal trajectory to the first memory locations in dataman
+                    for (int i=0; i < numOfWaypoints+1; i++){
+                        dm_lock(DM_KEY_MISSION_STATE);
+                        write_failed = dm_write((dm_item_t)mission.dataman_id, i,
+                                                      DM_PERSIST_POWER_ON_RESET, &finalWpsList[i].waypoint,
+                                                      sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
+                        if (write_failed) {
+                            PX4_WARN("My Write failed");
+                            //printf("Tried to write index %d: with original index %d\n", temp_counter, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
+                        }
+                        dm_unlock(DM_KEY_MISSION_STATE);
+                    }
+
+
+                    //Print the entire contents of the dataman file system
+                    for (int i = 0; i < numItems; i++){
+                        struct mission_item_s mission_item {};
+                        if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+                            /* error reading, mission is invalid */
+                            mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                            return;
+                        }
+
                         oneWaypoint.waypoint = mission_item;
                         oneWaypoint.originalIndex = i;
-
-                        if (oneWaypoint.waypoint.nav_cmd == 16){
-                            uploadedWpsList.push_back(oneWaypoint);
-                            waypointsCnt++;
-                            numOfWaypoints++;
-                        }
-
-			//uploadedWpsList[waypointsCnt++] = mission_item;
-		    }
-                }
-                numOfWaypoints--; //Subtract 1 from the total as the home destination is sent as the final waypoint
-		printf("waypointsCnt is: %d\n", waypointsCnt);
-                printf("Num of Waypoints is: %d\n", numOfWaypoints);
-
-
-                for (int i = 0; i < waypointsCnt; i++){
-                    printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
-		    	i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, uploadedWpsList[i].waypoint.nav_cmd);
+                        std::cout << "Index: " << oneWaypoint.originalIndex << ", " << oneWaypoint.waypoint.nav_cmd << ", " << oneWaypoint.waypoint.lat << ", " << oneWaypoint.waypoint.lon << std::endl;
+                    }
                 }
 
-		bool write_failed = false;
-		int waypointsIndex = 0;
+                    /***  END INSERTED CODE  ***/
 
-
-                /*** Collate the information needed to create a trajectory ***/
-                //Get Drone Information
-                /* Insert code here */
-
-                //Declare all dynamic arrays
-                waypoint_array = new WAYPOINTS [numOfWaypoints+2];
-                route_array = new WAYPOINTS [numOfWaypoints+2];
-
-                //Create the 2D dynamic cost array
-                cost_array = new double * [numOfWaypoints+2];
-                for (int i=0; i < numOfWaypoints+1; i++){
-                    cost_array[i] = new double [numOfWaypoints+2];
-                }
-
-                /*** CHANGE THIS FROM MAVSDK SCRIPT ***/
-                /*** IMPROVE BY TAKING HOME POSITION FROM LIVE DATA ***/
-
-                //Update takeoff and land position
-                waypoint_array[0].id = 0;
-                waypoint_array[0].user = "Takeoff";
-//                waypoint_array[0].lat = ;
-                waypoint_array[0].lat = uploadedWpsList[numOfWaypoints].waypoint.lat;
-//                waypoint_array[0].lon = ;
-                waypoint_array[0].lon = uploadedWpsList[numOfWaypoints].waypoint.lon;
-                waypoint_array[0].alt = 10.0;
-                //waypoint_array[0].alt = uploadedWPSList[numOfWaypoints].waypoint.alt;
-                waypoint_array[0].speed = 5.0f;
-
-                //Set the last point as the home position
-                waypoint_array[numOfWaypoints+1]=waypoint_array[0];
-
-                for (int i = 1; i < numOfWaypoints+1; i++){
-                    waypoint_array[i].id = i;
-                    waypoint_array[i].user = "Unkown";
-                    waypoint_array[i].lat = uploadedWpsList[i].waypoint.lat;
-                    waypoint_array[i].lon = uploadedWpsList[i].waypoint.lon;
-                    waypoint_array[i].alt = 10.0;
-                    waypoint_array[i].speed = 5.0;
-                    waypoint_array[i].deadline = 10;
-                    waypoint_array[i].payload = 0.2;
-                }
-
-                //Set the starting payload
-                for (int i=1; i<numOfWaypoints+1; i++){
-                    waypoint_array[0].payload += waypoint_array[i].payload;
-                }
-
-                //Print
-                std::cout << "" << std::endl;
-                for (int i=0; i<numOfWaypoints+2;i++) {
-                    std::cout << "Waypoint " << waypoint_array[i].id << ": "
-                              << waypoint_array[i].user << ", "
-                              << std::setprecision(8) << waypoint_array[i].lat << ", "
-                              << std::setprecision(8) << waypoint_array[i].lon << ", "
-                              << std::setprecision(2) << waypoint_array[i].alt << ", "
-                              << waypoint_array[i].speed << ", "
-                              << waypoint_array[i].deadline << ", "
-                              << waypoint_array[i].payload << std::endl;
-                }
-                std::cout << "" << std::endl;
-
-                std::cout.precision(5);
-
-                /*** Attempt to calculate a minimum cost trajectory ***/
-
-                //Calculate the 2D time array (spherical polar coordinates)
-                std::cout << "This program minimises the number of missed deadlines" << std::endl;
-                std::cout << "" << std::endl;
-                cost_array = trajectory.calc_cost(numOfWaypoints, waypoint_array);
-
-                //Calculating mission plan
-                std::cout << "Calculating best flight path:" << std::endl;
-                std::cout << "" << std::endl;
-               //std::cout << cost << std::endl;
-                cost = trajectory.call_mincost(waypoint_array, numOfWaypoints, route_array, cost_array);
-                cost += 3*numOfWaypoints;
-                std::cout << "\n\nMinimum cost is " << cost << " seconds" << std::endl;
-                std::cout << "" << std::endl;
-
-                for (int i=0; i<numOfWaypoints+1;i++) {
-                    std::cout << "Waypoint " << std::setprecision(8) << route_array[i].id << ", "
-                    << route_array[i].lat << std::endl;
-                }
-
-                //Ensure the flight time is within the maximum possible flight time
-//                float max_flight_time = drone.calc_max_flight_time();
-//                if ((cost/60) >= max_flight_time){
-//                    std::cout << "ERROR: Maximum flight time has been exceeded!" << std::endl;
-//                    return 1;
-//                }
-
-
-		//for (auto i = uploadedWpsList.begin(); i != uploadedWpsList.end(); ++i)
-		for (int i = 0; i < waypointsCnt; i++){
-			/* Reverse waypoints */
-			write_failed = dm_write((dm_item_t)mission.dataman_id, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex,
-					DM_PERSIST_POWER_ON_RESET, &uploadedWpsList[waypointsCnt-1-waypointsIndex].waypoint,
-					sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
-
-			if (!write_failed) {
-				PX4_WARN("My Write failed\n");
-				printf("Tried to write index %d: with original index %d\n", waypointsCnt-1-waypointsIndex, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
-                        }
-
-			//for (auto i = uploadedWpsList.begin(); i != uploadedWpsList.end(); ++i) (dm_item_t)mission.dataman_id
-			dm_lock(DM_KEY_MISSION_STATE);
-                        for (int t = 0; t < waypointsCnt; t++){
-				/* Reverse waypoints */
-				write_failed = dm_write((dm_item_t)mission.dataman_id, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex,
-						DM_PERSIST_POWER_ON_RESET, &uploadedWpsList[i].waypoint,
-						sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
-
-				if (write_failed) {
-					PX4_WARN("My Write failed");
-					printf("Tried to write index %d: with original index %d\n", waypointsCnt-1-waypointsIndex, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
-				}
-
-				waypointsIndex++;
-			}
-			dm_unlock(DM_KEY_MISSION_STATE);
-
-			/* Check updated trajectory */
-			printf("\nUpdated trajectory:\n");
-			waypointsIndex = 0;
-			//for (int i = 0; i < waypointsCnt; i++){
-                        for (int t = 0; t < numItems; t++){
-				struct mission_item_s mission_item {};
-
-				if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
-					/* error reading, mission is invalid */
-					mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
-					return;
-				}
-
-				/* check only items with valid lat/lon */
-				if (!MissionBlock::item_contains_position(mission_item)) {
-					continue;
-				} else {
-					printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n", waypointsIndex, mission_item.lat, mission_item.lon, mission_item.nav_cmd);
-					waypointsIndex++;
-				}
-			}
-		}
-                /***  END INSERTED CODE  ***/
 
 		_navigator->get_mission_result()->valid =
 			_missionFeasibilityChecker.checkMissionFeasible(_mission,
@@ -1875,42 +1815,7 @@ Mission::check_mission_valid(bool force)
 
 		// find and store landing start marker (if available)
 		find_mission_land_start();
-
-                //		if (numItems > 0) {
-                //			//struct mission_item_s uploadedWpsList[numItems];
-                //			int waypointsCnt = 0;
-                //			for (int i = 0; i < numItems; i++){
-                //				struct mission_item_s mission_item {};
-                //				if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
-                //					/* error reading, mission is invalid */
-                //					mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
-                //					return;
-                //				}
-
-                //				/* check only items with valid lat/lon */
-                //				if (!MissionBlock::item_contains_position(mission_item)) {
-                //					continue;
-                //				} else {
-                //					oneWaypoint.waypoint = mission_item;
-                //					oneWaypoint.originalIndex = i;
-                //					waypointsCnt++;
-
-                //					uploadedWpsList.push_back(oneWaypoint);
-                //					//uploadedWpsList[waypointsCnt++] = mission_item;
-                //				}
-                //                      }
-
-                //			printf("waypointsCnt is: %d\n", waypointsCnt);
-
-                //			for (int i = 0; i < waypointsCnt; i++){
-                //				printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
-                //					i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, uploadedWpsList[i].waypoint.nav_cmd);
-                //			}
-
-                //			int waypointsIndex = 0;
-                //			bool write_failed = false;
-
-    }
+        }
 }
 
 void
