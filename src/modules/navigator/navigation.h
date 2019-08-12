@@ -43,6 +43,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+//INCLUDE STRING?
 
 #if defined(MEMORY_CONSTRAINED_SYSTEM)
 #  define NUM_MISSIONS_SUPPORTED 50
@@ -185,6 +186,10 @@ struct mission_item_s {
 	};
 
 	uint8_t _padding1[2];				/**< padding struct size to alignment boundary  */
+        double payload;
+        double deadline;
+
+
 };
 
 /**

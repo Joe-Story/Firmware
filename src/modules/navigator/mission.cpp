@@ -1689,6 +1689,7 @@ Mission::check_mission_valid(bool force)
                             oneWaypoint.waypoint = mission_item;
                             oneWaypoint.originalIndex = i;
                             if (oneWaypoint.waypoint.nav_cmd == 16){
+                                oneWaypoint.waypoint.payload = 0.2;
                                 uploadedWpsList.push_back(oneWaypoint);
                                 finalWpsList.push_back(oneWaypoint);
                                 numOfWaypoints++;
@@ -1744,7 +1745,11 @@ Mission::check_mission_valid(bool force)
                     /* INSERT CODE HERE */
 
                     //Set the starting payload
-                    /* INSERT CODE HERE */
+                    double takeoff_weight=0;
+                    for (int i=0; i<numOfWaypoints; i++){
+                        takeoff_weight += uploadedWpsList[i].waypoint.payload;
+                    }
+                    std::cout << "The takeoff weight is: " << takeoff_weight << "kg" << std::endl;
 
                     /*** Attempt to calculate a minimum cost trajectory ***/
 
@@ -1770,6 +1775,16 @@ Mission::check_mission_valid(bool force)
                     //Ensure the flight time is within the maximum possible flight time
                     /* INSERT CODE HERE */
 
+                    //Clear previous items from dataman
+                    for (int i=0; i < numItems; i++){
+                        dm_lock(DM_KEY_WAYPOINTS_OFFBOARD_0);
+                        dm_lock(DM_KEY_WAYPOINTS_OFFBOARD_1);
+                        dm_clear(DM_KEY_WAYPOINTS_OFFBOARD_0);
+                        //dm_clear(DM_KEY_WAYPOINTS_OFFBOARD_1);
+                        dm_unlock(DM_KEY_WAYPOINTS_OFFBOARD_0);
+                        dm_unlock(DM_KEY_WAYPOINTS_OFFBOARD_1);
+                    }
+
                     //Write the optimal trajectory to the first memory locations in dataman
                     for (int i=0; i < numOfWaypoints+1; i++){
                         dm_lock(DM_KEY_MISSION_STATE);
@@ -1783,6 +1798,8 @@ Mission::check_mission_valid(bool force)
                         dm_unlock(DM_KEY_MISSION_STATE);
                     }
 
+                    //Update the mission count with the new number of items
+                    numItems = mission.count;
 
                     //Print the entire contents of the dataman file system
                     for (int i = 0; i < numItems; i++){
