@@ -1267,7 +1267,7 @@ MavlinkMissionManager::handle_mission_clear_all(const mavlink_message_t *msg)
 }
 
 int
-MavlinkMissionManager::parse_mavlink_mission_item(const mavlink_mission_item_t *mavlink_mission_item,
+MavlinkMissionManager::parse_mavlink_mission_item(mavlink_mission_item_t *mavlink_mission_item,
 		struct mission_item_s *mission_item)
 {
 	if (mavlink_mission_item->frame == MAV_FRAME_GLOBAL ||
@@ -1323,9 +1323,12 @@ MavlinkMissionManager::parse_mavlink_mission_item(const mavlink_mission_item_t *
 			mission_item->deadline = mavlink_mission_item->param3;
 			mission_item->payload_weight = mavlink_mission_item->param4;
 
-			/* FIXME this is explicitly set to NAN because this was param4 in MAVSDK -- still a better way is needed */
-			mission_item->yaw = wrap_2pi(math::radians(NAN));
-			//Original: mission_item->yaw = wrap_2pi(math::radians(mavlink_mission_item->param4));
+			/* FIXME these are explicitly set here because this was in MAVSDK -- still a better way is needed */
+			mavlink_mission_item->param3 = 0.0f;
+			mavlink_mission_item->param4 = NAN;
+
+			//mission_item->yaw = wrap_2pi(math::radians(NAN));
+			mission_item->yaw = wrap_2pi(math::radians(mavlink_mission_item->param4));
 			break;
 
 		case MAV_CMD_NAV_LOITER_UNLIM:

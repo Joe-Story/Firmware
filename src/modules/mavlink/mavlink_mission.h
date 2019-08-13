@@ -228,7 +228,7 @@ private:
 	 *			       depending on _int_mode
 	 * @param mission_item	       pointer to mission_item to construct
 	 */
-	int parse_mavlink_mission_item(const mavlink_mission_item_t *mavlink_mission_item, struct mission_item_s *mission_item);
+	int parse_mavlink_mission_item(mavlink_mission_item_t *mavlink_mission_item, struct mission_item_s *mission_item);
 
 	/**
 	 * Format mission_item_s as mavlink MISSION_ITEM(_INT) message.
