@@ -215,7 +215,7 @@ class TRAJECTORY{
             if(is_final != true){
                 cost+=kmin;
             }
-            return {np, cost, is_final};
+            return std::make_tuple(np, cost, is_final);
         }
 
         //Finds a close to optimal route using the 'Greedy' method
@@ -237,7 +237,7 @@ class TRAJECTORY{
                 nposition=0;
                 std::cout << nposition;
                 cost+=cost_array[position][nposition];
-                return {cost, finalWpsList};
+                return std::make_tuple(cost, finalWpsList);
             }
 
             return mincost(nposition, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n);

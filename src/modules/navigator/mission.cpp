@@ -1689,10 +1689,19 @@ Mission::check_mission_valid(bool force)
                             oneWaypoint.waypoint = mission_item;
                             oneWaypoint.originalIndex = i;
                             if (oneWaypoint.waypoint.nav_cmd == 16){
-                                oneWaypoint.waypoint.payload = 0.2;
+                                //oneWaypoint.waypoint.payload = 0.2;
+				printf("Waypoint weight is %f deadline is %f\n",oneWaypoint.waypoint.payload_weight,oneWaypoint.waypoint.deadline);
                                 uploadedWpsList.push_back(oneWaypoint);
                                 finalWpsList.push_back(oneWaypoint);
                                 numOfWaypoints++;
+
+				/*
+				printf("Nav_cmd is %d. Params are: ",oneWaypoint.waypoint.nav_cmd);
+				for (int j=0; j < 7; j++) {
+					printf("%d: %f, ",j,(double) oneWaypoint.waypoint.params[j]);
+				}
+			    	printf("\n");
+				    */
                             }
                         }
                     }
@@ -1747,7 +1756,7 @@ Mission::check_mission_valid(bool force)
                     //Set the starting payload
                     double takeoff_weight=0;
                     for (int i=0; i<numOfWaypoints; i++){
-                        takeoff_weight += uploadedWpsList[i].waypoint.payload;
+                        takeoff_weight += uploadedWpsList[i].waypoint.payload_weight;
                     }
                     std::cout << "The takeoff weight is: " << takeoff_weight << "kg" << std::endl;
 

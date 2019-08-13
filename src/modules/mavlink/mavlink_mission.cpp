@@ -1318,7 +1318,14 @@ MavlinkMissionManager::parse_mavlink_mission_item(const mavlink_mission_item_t *
 			mission_item->nav_cmd = NAV_CMD_WAYPOINT;
 			mission_item->time_inside = mavlink_mission_item->param1;
 			mission_item->acceptance_radius = mavlink_mission_item->param2;
-			mission_item->yaw = wrap_2pi(math::radians(mavlink_mission_item->param4));
+
+			//printf("DEBUG param3 %f param4 %f\n",(double) mavlink_mission_item->param3,(double) mavlink_mission_item->param4);
+			mission_item->deadline = mavlink_mission_item->param3;
+			mission_item->payload_weight = mavlink_mission_item->param4;
+
+			/* FIXME this is explicitly set to NAN because this was param4 in MAVSDK -- still a better way is needed */
+			mission_item->yaw = wrap_2pi(math::radians(NAN));
+			//Original: mission_item->yaw = wrap_2pi(math::radians(mavlink_mission_item->param4));
 			break;
 
 		case MAV_CMD_NAV_LOITER_UNLIM:

@@ -186,10 +186,8 @@ struct mission_item_s {
 	};
 
 	uint8_t _padding1[2];				/**< padding struct size to alignment boundary  */
-        double payload;
+        double payload_weight;
         double deadline;
-
-
 };
 
 /**
