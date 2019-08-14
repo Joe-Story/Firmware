@@ -160,8 +160,9 @@ void update_trajectory(mission_s mission = _mission){
         //Calculate the 2D cost/time array (using spherical polar coordinates)
         std::cout << "This program minimises the number of missed deadlines" << std::endl;
         std::cout << "" << std::endl;
+        std::cout.precision(3);
         cost_array = trajectory.calc_cost(numOfWaypoints, uploadedWpsList);
-        energy_array = trajectory.calc_energy(numOfWaypoints, uploadedWpsList);
+        std::cout.precision(8);
         double energy;
 
         //Calculate the optimal trajectory
@@ -169,6 +170,7 @@ void update_trajectory(mission_s mission = _mission){
         std::cout << "" << std::endl;
         std::tie (cost, energy, finalWpsList) = trajectory.call_mincost(uploadedWpsList, numOfWaypoints, finalWpsList, cost_array);
         cost += 3*numOfWaypoints;
+        //ADD TAKEOFF ENERGY?
         std::cout << "\n\nMinimum cost is " << cost << " seconds" << std::endl;
         std::cout << "" << std::endl;
         std::cout << "Battery usage is " << energy << "%" << std::endl;
@@ -207,7 +209,7 @@ void update_trajectory(mission_s mission = _mission){
         }
 
         //Update the mission count with the new number of items
-        mission.count = numOfWaypoints;
+        mission.count = numOfWaypoints+1;
         numItems = mission.count;
 
         //Print the entire contents of the dataman file system

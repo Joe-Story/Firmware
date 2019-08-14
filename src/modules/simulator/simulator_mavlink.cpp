@@ -393,8 +393,14 @@ void Simulator::handle_message_hil_sensor(const mavlink_message_t *msg)
             //const float discharge_interval_us = _param_sim_bat_drain.get() * 1000 * 1000;
             float mass = 1.38, rho = 1.225, g = 9.81, area = 0.180956, bat_energy = 81.3, efficiency = 100, power;
 
-            //Calculate the power required for the drone to hover and gain altitude (Velocity and acceleration are currently not in the same direction)
-            power = (sqrt((pow(mass, 3)*pow(g, 3))/(2*rho*area)) + (mass*g*(-gps_vd))) / (efficiency/100);
+            //Calculate the power required for the drone to hover and gain altitude (Velocity and acceleration are currently not in the same direction) (take into account the altitude on ascent)
+            if (gps_vd <= 0){
+                power = (sqrt((pow(mass, 3)*pow(g, 3))/(2*rho*area)) + (mass*g*(-gps_vd))) / (efficiency/100);
+            } else {
+                power = (sqrt((pow(mass, 3)*pow(g, 3))/(2*rho*area)));
+            }
+
+            power = abs(power); //Ensure that the power is never negative
             //+ (mass * abs(imu.xacc) * abs(gps_vn)) + (mass * abs(imu.yacc) * abs(gps_ve)) + (mass * abs(imu.zacc - 9.81) * abs(gps_vd));
 
 

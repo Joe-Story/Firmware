@@ -64,6 +64,7 @@ class DRONE{
         double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                         (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
         double time = (x)/(flight_speed);
+        time += 5; // Approximate time required to deliver and item
 
         double power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
         double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
@@ -99,6 +100,7 @@ class WAYPOINTS{
                         (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
 
         double time = (x)/(flight_speed);
+        time += 5; // Approximate time required to deliver an item
         return time;
     }
 
@@ -128,46 +130,15 @@ class TRAJECTORY{
             std::cout << "" << std::endl;
             for (int i = 0; i < num_waypoints+1; i++){
                 std::cout << "[";
-                for (int t = 0; t < num_waypoints+1; t++){
+                for (int t = 0; t < num_waypoints; t++){
                     std::cout << cost2d[i][t] << ",  ";
                 }
+                std::cout << cost2d[i][num_waypoints];
                 std::cout << "]" << std::endl;
             }
             std::cout << "" << std::endl;
 
             return cost2d;
-        }
-
-        //Calculates a 2D cost array based on the cost function used
-        double** calc_energy(int num_waypoints, std::vector<mission_waypoint_t> array){
-            DRONE cost_object;
-            double ** energy2d;
-            double speed = 5.0;
-            energy2d = new double * [num_waypoints+2];
-
-            for (int i=0; i < num_waypoints+1; i++){
-                energy2d[i] = new double [num_waypoints+2];
-            }
-
-            for (int i = 0; i < num_waypoints+1; i++){
-                for (int t = 0; t < num_waypoints+1; t++){
-                    energy2d[i][t] = cost_object.calc_energy_use(array[i].waypoint.altitude, array[t].waypoint.altitude, array[i].waypoint.lat, array[t].waypoint.lat, array[i].waypoint.lon, array[t].waypoint.lon, speed, array[i].waypoint.payload_weight);
-                }
-            }
-
-            //Print the 2D Cost array
-            std::cout << "2D Energy Array:" << std::endl;
-            std::cout << "" << std::endl;
-            for (int i = 0; i < num_waypoints+1; i++){
-                std::cout << "[";
-                for (int t = 0; t < num_waypoints+1; t++){
-                    std::cout << energy2d[i][t] << "%,  ";
-                }
-                std::cout << "]" << std::endl;
-            }
-            std::cout << "" << std::endl;
-
-            return energy2d;
         }
 
         //Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
