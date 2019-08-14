@@ -68,20 +68,23 @@ class Trajectory
         double** calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array);
 
         //Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
-        std::tuple<double, double, std::vector<mission_waypoint_t>> call_mincost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList, double ** cost_array);
+        std::tuple<double, double, std::vector<mission_waypoint_t>> calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList);
 
         //Finds the nearest neighbour that hasn't been visited
         std::tuple<int, double, bool> least(int p, int num_waypoints, int completed[], double ** cost_array, double cost);
 
         //Finds a close to optimal route using the 'Greedy' method
-        std::tuple <double, double, std::vector<mission_waypoint_t>> mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight);
+        std::tuple <double, double, std::vector<mission_waypoint_t>> solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight);
+
+        //Finds an optimal route using the 'Brute Force' method
+        void solution_bruteforce (int level, int maxLevel, int *trajectory, int *visitedNodes, std::vector<mission_waypoint_t> uploadedWpsList, int *numOfTajectories, double ** cost_array);
 
         //Calculate the distance between two waypoints in spherical polar coordinates (latitude, longitude, and altitude)
-        double calc_flight_time(double alt1, double alt2, double lat1, double lat2, double lon1, double lon2, double flight_speed);
+        double calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed);
 
         //Calculate an estimate of the maximum drone flight time in minutes
         double calc_max_flight_time(void);
 
         //Calculate an estimate of the battery percentage used between two waypoints
-        double calc_energy_use(double alt1, double alt2, double lat1, double lat2, double lon1, double lon2, double flight_speed, double payload);
+        double calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed, double payload);
 };

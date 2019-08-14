@@ -44,12 +44,15 @@ Trajectory::Trajectory()
 }
 
 double
-Trajectory::calc_flight_time(double alt1, double alt2, double lat1, double lat2, double lon1, double lon2, double flight_speed)
+Trajectory::calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed)
 {
-    double lat1_rad = (lat1/180)*pi;
-    double lat2_rad = (lat2/180)*pi;
-    double lon1_rad = (lon1/180)*pi;
-    double lon2_rad = (lon2/180)*pi;
+    double lat1_rad = (waypoint1.lat/180)*pi;
+    double lat2_rad = (waypoint2.lat/180)*pi;
+    double lon1_rad = (waypoint1.lon/180)*pi;
+    double lon2_rad = (waypoint2.lon/180)*pi;
+
+    double alt1 = waypoint1.altitude;
+    double alt2 = waypoint2.altitude;
 
     double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                     (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
@@ -57,6 +60,46 @@ Trajectory::calc_flight_time(double alt1, double alt2, double lat1, double lat2,
     double time = (x/flight_speed) + DELIVERY_TIME_SEC; // Approximate time required to deliver an item
 
     return time;
+}
+
+//Calculate an estimate of the battery percentage used between two waypoints
+double
+Trajectory::calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed, double payload)
+{
+    double lat1_rad = (waypoint1.lat/180)*pi;
+    double lat2_rad = (waypoint2.lat/180)*pi;
+    double lon1_rad = (waypoint1.lon/180)*pi;
+    double lon2_rad = (waypoint2.lon/180)*pi;
+
+    double alt1 = waypoint1.altitude;
+    double alt2 = waypoint2.altitude;
+
+    double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
+                    (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
+
+    double time = (x/flight_speed) + DELIVERY_TIME_SEC; // Approximate time required to deliver an item
+
+    double power;
+    /*
+    power = pow(mass+bat_mass+payload,3);
+    printf("DEBUG0 power = %f\n",power);
+
+    power = (pow(mass+bat_mass+payload,3)*pow(g,3));
+    printf("DEBUG1 power = %f\n",power);
+
+    power = (2*1.225*0.568489194);
+    printf("DEBUG2 power = %f\n",power);
+
+    power = (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) ;
+    printf("DEBUG3 power = %f\n",power);
+    */
+    //power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
+    power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*1.225*0.568489194) );
+    //printf("DEBUG4 power = %f\n",power);
+
+    double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
+
+    return percent_used;
 }
 
 double
@@ -83,13 +126,13 @@ Trajectory::calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array)
 
     for (int i = 0; i < num_waypoints+1; i++){
         for (int t = 0; t < num_waypoints+1; t++){
-            cost2d[i][t] = calc_flight_time(array[i].waypoint.altitude, array[t].waypoint.altitude, array[i].waypoint.lat, array[t].waypoint.lat, array[i].waypoint.lon, array[t].waypoint.lon, speed);
+            cost2d[i][t] = calc_flight_time(array[i].waypoint, array[t].waypoint, speed);
         }
     }
 
     //Print the 2D Cost array
     std::cout << "2D Cost Array:" << std::endl;
-    std::cout << "" << std::endl;
+
     for (int i = 0; i < num_waypoints+1; i++){
         std::cout << "[";
         for (int t = 0; t < num_waypoints; t++){
@@ -101,25 +144,6 @@ Trajectory::calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array)
     std::cout << "" << std::endl;
 
     return cost2d;
-}
-
-//Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
-std::tuple<double, double, std::vector<mission_waypoint_t>>
-Trajectory::call_mincost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList, double ** cost_array)
-{
-    double cost = 0;
-    int n = 0;
-    int completed[num_waypoints+1] = {0};
-    double energy = 0;
-
-    //Set the starting payload
-    double payload_weight=0;
-    for (int i=0; i<num_waypoints+1; i++){
-        payload_weight += uploadedWpsList[i].waypoint.payload_weight;
-    }
-
-    return Trajectory::mincost(0, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n, energy, payload_weight);
-
 }
 
 //Finds the nearest neighbour that hasn't been visited
@@ -159,21 +183,22 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
 
 //Finds a close to optimal route using the 'Greedy' method
 std::tuple <double, double, std::vector<mission_waypoint_t>>
-Trajectory::mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight)
+Trajectory::solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int visited[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight)
 {
     int nposition;
     bool is_final = false;
     double speed = 5.0;
 
-    //Set the current position as completed
-    completed[position]=1;
+    //Set the current position as visited
+    visited[position]=1;
 
     std::cout << position << "--->";
 
-    finalWpsList.at(n) = uploadedWpsList[position];
+    //finalWpsList.at(n) = uploadedWpsList[position];
+    finalWpsList.push_back(uploadedWpsList[position]);
 
-    std::tie(nposition, cost, is_final) = least(position, num_waypoints, completed, cost_array, cost);
-    energy += calc_energy_use(uploadedWpsList[position].waypoint.altitude, uploadedWpsList[nposition].waypoint.altitude, uploadedWpsList[position].waypoint.lat, uploadedWpsList[nposition].waypoint.lat, uploadedWpsList[position].waypoint.lon, uploadedWpsList[nposition].waypoint.lon, speed, payload_weight);
+    std::tie(nposition, cost, is_final) = least(position, num_waypoints, visited, cost_array, cost);
+    energy += calc_energy_use(uploadedWpsList[position].waypoint, uploadedWpsList[nposition].waypoint, speed, payload_weight);
 
     //Remove the delivered payload from the total payload weight
     payload_weight -= uploadedWpsList[nposition].waypoint.payload_weight;
@@ -183,29 +208,105 @@ Trajectory::mincost(int position, std::vector<mission_waypoint_t> uploadedWpsLis
         std::cout << nposition;
         cost+=cost_array[position][nposition];
         return std::make_tuple(cost, energy, finalWpsList);
+    } else {
+        return solution_mincost(nposition, uploadedWpsList, num_waypoints, cost, visited, finalWpsList, cost_array, n++, energy, payload_weight);
     }
-
-    n++;
-    return mincost(nposition, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n, energy, payload_weight);
 }
 
-//Calculate an estimate of the battery percentage used between two waypoints
-double
-Trajectory::calc_energy_use(double alt1, double alt2, double lat1, double lat2, double lon1, double lon2, double flight_speed, double payload)
+//Finds an to optimal route using the 'Brute Force' method
+void
+Trajectory::solution_bruteforce (int level, int maxLevel, int *trajectory, int *visitedNodes, std::vector<mission_waypoint_t> uploadedWpsList, int *numOfTajectories, double ** cost_array) {
+	int i, j;
+
+	for (i=0; i<maxLevel; i++) {
+		if (visitedNodes[i] == 0) {
+			trajectory[level] = i;
+			visitedNodes[i] = 1;
+
+			if (level < (maxLevel-1)) {
+				Trajectory::solution_bruteforce (level+1, maxLevel, trajectory, visitedNodes, uploadedWpsList, numOfTajectories, cost_array);
+			} else if (level == (maxLevel-1)) {
+				(*numOfTajectories)++;
+
+                for (j=0; j<maxLevel-1; j++) {
+		            printf("%d--->", trajectory[j]);
+	            }
+                printf("%d ", trajectory[j]);
+
+                /* Return is missing */
+
+                double trajectory_cost = 0;
+                double trajectory_payload = uploadedWpsList[0].waypoint.payload_weight;
+                for (j=0; j<maxLevel-1; j++) {
+                    //printf("\n j: %d trajectory_cost: %f trajectory_payload: %f next: %f \n", j, trajectory_cost, trajectory_payload, uploadedWpsList[j+1].waypoint.payload_weight);
+                    trajectory_cost += Trajectory::calc_energy_use(uploadedWpsList[j].waypoint, uploadedWpsList[j+1].waypoint, 5, trajectory_payload);
+                    trajectory_payload -= uploadedWpsList[j+1].waypoint.payload_weight;
+                }
+
+                printf("with cost %f\n", trajectory_cost);
+
+			} else {
+				printf("Level is wrong. Level %d maxLevel %d\n",level,maxLevel);
+			}
+
+			trajectory[level] = '\0';
+			visitedNodes[i] = 0;
+		}
+	}
+}
+
+//Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
+std::tuple<double, double, std::vector<mission_waypoint_t>>
+Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList)
 {
-    double lat1_rad = (lat1/180)*pi;
-    double lat2_rad = (lat2/180)*pi;
-    double lon1_rad = (lon1/180)*pi;
-    double lon2_rad = (lon2/180)*pi;
+    double cost = 0;
+    int n = 0, numOfTajectories=0;
+    int visited[num_waypoints] = {0}, trajectory[num_waypoints] = {0}, visitedNodes[num_waypoints] = {0};
+    double energy = 0;
+    double **cost_array;
 
-    double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
-                    (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
-    double time = (x/flight_speed) + DELIVERY_TIME_SEC; // Approximate time required to deliver an item
+    //Set the starting payload
+    double takeoff_weight=0;
 
-    double power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
-    double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
+    //Create the 2D dynamic and energy cost array
+    cost_array = new double * [num_waypoints+1];
+    for (int i=0; i < num_waypoints+1; i++){
+        cost_array[i] = new double [num_waypoints+1];
+    }
 
-    return percent_used;
+    //Update takeoff and land position using PX4 rather than MAVSDK
+    /* INSERT CODE HERE */
+
+    //Set the last point as the home position
+    /* INSERT CODE HERE */
+
+    //Calculate the 2D cost/time array (using spherical polar coordinates)
+    cost_array = calc_cost(num_waypoints, uploadedWpsList);
+
+    //Set the starting payload
+    for (int i=0; i<num_waypoints+1; i++){
+        takeoff_weight += uploadedWpsList[i].waypoint.payload_weight;
+    }
+
+    printf("\nThe takeoff weight is: %f kg\n",(double) takeoff_weight);
+    uploadedWpsList[0].waypoint.payload_weight = takeoff_weight;
+
+    /*
+    for (i=0; i < num_waypoints; i++) {
+		trajectory[i] = 0;
+		visitedNodes[i] = 0;
+	}
+    */
+
+    /* Set takeoff as first point */
+    trajectory[0] = 0;
+    visitedNodes[0] = 1;
+    Trajectory::solution_bruteforce (1, num_waypoints, trajectory, visitedNodes, uploadedWpsList, &numOfTajectories, cost_array);
+
+    printf("\nBrute force evaluated %d routes\n",numOfTajectories);
+
+    return Trajectory::solution_mincost(0, uploadedWpsList, num_waypoints, cost, visited, finalWpsList, cost_array, n, energy, takeoff_weight);
+
 }
 
 void
@@ -214,7 +315,6 @@ Trajectory::update_trajectory(mission_s mission)
     vector<mission_waypoint_t> uploadedWpsList;
     vector<mission_waypoint_t> finalWpsList;
     mission_waypoint_t oneWaypoint;
-    double** local_cost_array, ** energy_array;
     double cost, energy;
     bool write_failed = false;
     int numItems = mission.count;
@@ -244,18 +344,14 @@ Trajectory::update_trajectory(mission_s mission)
                 if (oneWaypoint.waypoint.nav_cmd == 16){
                     printf("Waypoint weight is %f deadline is %f\n",oneWaypoint.waypoint.payload_weight,oneWaypoint.waypoint.deadline);
                     uploadedWpsList.push_back(oneWaypoint);
-                    finalWpsList.push_back(oneWaypoint);
+                    //finalWpsList.push_back(oneWaypoint);
                     numOfWaypoints++;
                 }
             }
         }
 
         //Check that waypoints have been found
-        if (numOfWaypoints > 0){
-            //Subtract 1 from the total as one item is the home position
-            numOfWaypoints--;
-        }
-        else {
+        if (numOfWaypoints <= 0) {
             PX4_WARN("NO WAYPOINTS FOUND");
             return;
         }
@@ -271,55 +367,26 @@ Trajectory::update_trajectory(mission_s mission)
         printf("Num of Waypoints is: %d\n", numOfWaypoints);
 
         //Print the received waypoints
-        for (int i = 0; i < numOfWaypoints+1; i++){
+        for (int i = 0; i < numOfWaypoints; i++){
             printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
                 i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, uploadedWpsList[i].waypoint.nav_cmd);
         }
 
         /*** Collate the information needed to create a trajectory ***/
 
-        //Create the 2D dynamic cost array
-        local_cost_array = new double * [numOfWaypoints+2];
-        for (int i=0; i < numOfWaypoints+1; i++){
-            local_cost_array[i] = new double [numOfWaypoints+2];
-        }
-
-        //Create the 2D dynamic energy array
-        energy_array = new double * [numOfWaypoints+2];
-        for (int i=0; i < numOfWaypoints+1; i++){
-            energy_array[i] = new double [numOfWaypoints+2];
-        }
-
-        //Update takeoff and land position using PX4 rather than MAVSDK
-        /* INSERT CODE HERE */
-
-        //Set the last point as the home position
-        /* INSERT CODE HERE */
-
-        //Set the starting payload
-        double takeoff_weight=0;
-        for (int i=0; i<numOfWaypoints+1; i++){
-            takeoff_weight += uploadedWpsList[i].waypoint.payload_weight;
-        }
-
-        printf("\nThe takeoff weight is: %d kg\n",takeoff_weight);
-
         /*** Attempt to calculate a minimum cost trajectory ***/
 
-        //Calculate the 2D cost/time array (using spherical polar coordinates)
-        local_cost_array = calc_cost(numOfWaypoints, uploadedWpsList);
-
         //Calculate the optimal trajectory
-        printf("Calculating best flight path:\n");
+        printf("\nCalculating best flight path:\n");
 
-        std::tie (cost, energy, finalWpsList) = call_mincost(uploadedWpsList, numOfWaypoints, finalWpsList, local_cost_array);
+        std::tie (cost, energy, finalWpsList) = calc_solution(uploadedWpsList, numOfWaypoints, finalWpsList);
         cost += 3*numOfWaypoints; /* What is this ? */
 
         printf("\nMinimum cost is %f seconds\n", (double) cost);
         printf("Battery usage is %f %\n", (double) energy);
 
         //Print the final trajectory
-        for (int i = 0; i < numOfWaypoints+1; i++){
+        for (int i = 0; i < numOfWaypoints; i++){
             printf("Waypoint %d: Lat: %f Lon: %f nav_cmd: %d\n",
                 i, finalWpsList[i].waypoint.lat, finalWpsList[i].waypoint.lon, finalWpsList[i].waypoint.nav_cmd);
         }
@@ -338,7 +405,7 @@ Trajectory::update_trajectory(mission_s mission)
 //                    }
 
         //Write the optimal trajectory to the first memory locations in dataman
-        for (int i=0; i < numOfWaypoints+1; i++){
+        for (int i=0; i < numOfWaypoints; i++){
             dm_lock(DM_KEY_MISSION_STATE);
             write_failed = dm_write((dm_item_t)mission.dataman_id, i,
                                           DM_PERSIST_POWER_ON_RESET, &finalWpsList[i].waypoint,
@@ -351,7 +418,7 @@ Trajectory::update_trajectory(mission_s mission)
         }
 
         //Update the mission count with the new number of items
-        mission.count = numOfWaypoints+1;
+        mission.count = numOfWaypoints;
         numItems = mission.count;
 
         //Print the entire contents of the dataman file system
