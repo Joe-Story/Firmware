@@ -31,24 +31,43 @@ const double rho = 1.225; //Density of air in kgm^-3
 class DRONE{
   public:
     //Physical drone properties
-    double mass;
-    int num_rotors;
-    double rotor_radius;
-    double max_velocity;
-    double min_velocity;
+    const double mass = 1.38; // kg
+    const int num_rotors = 4; // -
+    const double rotor_radius = 0.12; // m
+    double rotor_area = num_rotors * (pi * pow(rotor_radius, 2)); // m^2
+    double max_velocity; // m/s
+    double min_velocity; // m/s
 
     //Battery and electrical properties
-    double bat_capacity;
-    double bat_voltage;
-    double efficiency;
+    double bat_capacity; // mAh
+    const double bat_voltage = 15.2; // V
+    const double bat_energy = 81.3; // Wh
+    const double bat_mass = 0; // kg
+    const double efficiency = 100.0; // %
+
 
     //Calculate an estimate of the maximum drone flight time in minutes
     double calc_max_flight_time(){
-        double rotor_area = num_rotors * (pi * pow(rotor_radius, 2));
         double power = sqrt( (2*pow(mass,3)*pow(g,3)) / (rho*rotor_area) );
         double energy = bat_voltage * bat_capacity * pow(10,-3); //Battery energy in Wh
         double max_flight_time = (energy/power) * 60; //Max flight time in minutes
         return max_flight_time;
+    }
+
+    //Calculate an estimate of the battery percentage used between two waypoints
+    double calc_energy_use(double alt1, double alt2, double lat1, double lat2, double lon1, double lon2, double flight_speed, double payload){
+        double lat1_rad = (lat1/180)*pi;
+        double lat2_rad = (lat2/180)*pi;
+        double lon1_rad = (lon1/180)*pi;
+        double lon2_rad = (lon2/180)*pi;
+
+        double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
+                        (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
+        double time = (x)/(flight_speed);
+
+        double power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
+        double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
+        return percent_used;
     }
 };
 
@@ -119,13 +138,51 @@ class TRAJECTORY{
             return cost2d;
         }
 
+        //Calculates a 2D cost array based on the cost function used
+        double** calc_energy(int num_waypoints, std::vector<mission_waypoint_t> array){
+            DRONE cost_object;
+            double ** energy2d;
+            double speed = 5.0;
+            energy2d = new double * [num_waypoints+2];
+
+            for (int i=0; i < num_waypoints+1; i++){
+                energy2d[i] = new double [num_waypoints+2];
+            }
+
+            for (int i = 0; i < num_waypoints+1; i++){
+                for (int t = 0; t < num_waypoints+1; t++){
+                    energy2d[i][t] = cost_object.calc_energy_use(array[i].waypoint.altitude, array[t].waypoint.altitude, array[i].waypoint.lat, array[t].waypoint.lat, array[i].waypoint.lon, array[t].waypoint.lon, speed, array[i].waypoint.payload_weight);
+                }
+            }
+
+            //Print the 2D Cost array
+            std::cout << "2D Energy Array:" << std::endl;
+            std::cout << "" << std::endl;
+            for (int i = 0; i < num_waypoints+1; i++){
+                std::cout << "[";
+                for (int t = 0; t < num_waypoints+1; t++){
+                    std::cout << energy2d[i][t] << "%,  ";
+                }
+                std::cout << "]" << std::endl;
+            }
+            std::cout << "" << std::endl;
+
+            return energy2d;
+        }
+
         //Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
-        std::tuple<double, std::vector<mission_waypoint_t>> call_mincost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList, double ** cost_array){
+        std::tuple<double, double, std::vector<mission_waypoint_t>> call_mincost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList, double ** cost_array){
             double cost = 0;
             int n = 0;
             int completed[num_waypoints+1] = {0};
+            double energy = 0;
+            //Set the starting payload
+            double payload_weight=0;
+            for (int i=0; i<num_waypoints+1; i++){
+                payload_weight += uploadedWpsList[i].waypoint.payload_weight;
+            }
 
-            return TRAJECTORY::mincost(0, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n);
+            return TRAJECTORY::mincost(0, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n, energy, payload_weight);
 
         }
 
@@ -163,28 +220,34 @@ class TRAJECTORY{
         }
 
         //Finds a close to optimal route using the 'Greedy' method
-        std::tuple <double, std::vector<mission_waypoint_t>> mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n){
+        std::tuple <double, double, std::vector<mission_waypoint_t>> mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight){
             int nposition;
             bool is_final = false;
+            double speed = 5.0;
+            DRONE drone;
 
+            //Set the current position as completed
             completed[position]=1;
 
             std::cout << position << "--->";
 
             finalWpsList.at(n) = uploadedWpsList[position];
-            n++;
 
-            //nposition = least(position, num_waypoints);
             std::tie(nposition, cost, is_final) = TRAJECTORY::least(position, num_waypoints, completed, cost_array, cost);
+            energy+=drone.calc_energy_use(uploadedWpsList[position].waypoint.altitude, uploadedWpsList[nposition].waypoint.altitude, uploadedWpsList[position].waypoint.lat, uploadedWpsList[nposition].waypoint.lat, uploadedWpsList[position].waypoint.lon, uploadedWpsList[nposition].waypoint.lon, speed, payload_weight);
+
+            //Remove the delivered payload from the total payload weight
+            payload_weight -= uploadedWpsList[nposition].waypoint.payload_weight;
 
             if(is_final == true){
                 nposition=0;
                 std::cout << nposition;
                 cost+=cost_array[position][nposition];
-                return std::make_tuple(cost, finalWpsList);
+                return std::make_tuple(cost, energy, finalWpsList);
             }
 
-            return mincost(nposition, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n);
+            n++;
+            return mincost(nposition, uploadedWpsList, num_waypoints, cost, completed, finalWpsList, cost_array, n, energy, payload_weight);
         }
 
 };

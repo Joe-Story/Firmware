@@ -49,8 +49,9 @@ int numOfWaypoints;
 DRONE drone;
 TRAJECTORY trajectory;
 
-//Declare dynamic cost array
+//Declare dynamic cost and energy array
 double ** cost_array;
+double ** energy_array;
 
 /*** END OF SETUP ***/
 
@@ -135,6 +136,12 @@ void update_trajectory(mission_s mission = _mission){
             cost_array[i] = new double [numOfWaypoints+2];
         }
 
+        //Create the 2D dynamic energy array
+        energy_array = new double * [numOfWaypoints+2];
+        for (int i=0; i < numOfWaypoints+1; i++){
+            energy_array[i] = new double [numOfWaypoints+2];
+        }
+
         //Update takeoff and land position using PX4 rather than MAVSDK
         /* INSERT CODE HERE */
 
@@ -143,7 +150,7 @@ void update_trajectory(mission_s mission = _mission){
 
         //Set the starting payload
         double takeoff_weight=0;
-        for (int i=0; i<numOfWaypoints; i++){
+        for (int i=0; i<numOfWaypoints+1; i++){
             takeoff_weight += uploadedWpsList[i].waypoint.payload_weight;
         }
         std::cout << "The takeoff weight is: " << takeoff_weight << "kg" << std::endl;
@@ -154,13 +161,17 @@ void update_trajectory(mission_s mission = _mission){
         std::cout << "This program minimises the number of missed deadlines" << std::endl;
         std::cout << "" << std::endl;
         cost_array = trajectory.calc_cost(numOfWaypoints, uploadedWpsList);
+        energy_array = trajectory.calc_energy(numOfWaypoints, uploadedWpsList);
+        double energy;
 
         //Calculate the optimal trajectory
         std::cout << "Calculating best flight path:" << std::endl;
         std::cout << "" << std::endl;
-        std::tie (cost, finalWpsList) = trajectory.call_mincost(uploadedWpsList, numOfWaypoints, finalWpsList, cost_array);
+        std::tie (cost, energy, finalWpsList) = trajectory.call_mincost(uploadedWpsList, numOfWaypoints, finalWpsList, cost_array);
         cost += 3*numOfWaypoints;
         std::cout << "\n\nMinimum cost is " << cost << " seconds" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Battery usage is " << energy << "%" << std::endl;
         std::cout << "" << std::endl;
 
         //Print the final trajectory

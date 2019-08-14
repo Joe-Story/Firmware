@@ -28,7 +28,7 @@ Rectangle {
             //   component id
             //   confirmation
             //   param 1-7
-            onClicked: controller.sendCommand(179, 50, 0, 1, 0, 0, 0, 0, 0, 0)
+            onClicked: controller.sendCommand(16, 50, 0, 1, 0, 0, 0, 47.829011, 8.454, 10.0)
         }
 
         // The FactTextField control is bound to the specified parameter. Note that there is no validation.
