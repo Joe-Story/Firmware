@@ -1320,8 +1320,8 @@ MavlinkMissionManager::parse_mavlink_mission_item(mavlink_mission_item_t *mavlin
 			mission_item->acceptance_radius = mavlink_mission_item->param2;
 
 			//printf("DEBUG param3 %f param4 %f\n",(double) mavlink_mission_item->param3,(double) mavlink_mission_item->param4);
-			mission_item->deadline = mavlink_mission_item->param3;
-			mission_item->payload_weight = mavlink_mission_item->param4;
+                        mission_item->payload_weight = mavlink_mission_item->param3;
+                        mission_item->deadline = mavlink_mission_item->param4;
 
 			/* FIXME these are explicitly set here because this was in MAVSDK -- still a better way is needed */
 			mavlink_mission_item->param3 = 0.0f;
