@@ -32,25 +32,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-//Some of these may not be necessary
-
-//using namespace std::placeholders; //IS THIS NECESSARY?
-//using namespace std::chrono; // for seconds(), milliseconds()
-//using namespace std::this_thread; // for sleep_for()
 
 using namespace std;
 
 #include "trajectory.h"
 
-//Declare cost function variables and class objects
-int mission_iterator = 0;
-int numOfWaypoints;
-Trajectory _trajectory;
-
-//Declare dynamic cost and energy array
-double ** energy_array;
-
-/*** END OF SETUP ***/
+#define DELIVERY_TIME_SEC 5.0 /* How close to reality is this? */
 
 Trajectory::Trajectory()
 {
@@ -67,8 +54,8 @@ Trajectory::calc_flight_time(double alt1, double alt2, double lat1, double lat2,
     double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                     (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
 
-    double time = (x)/(flight_speed);
-    time += 5; // Approximate time required to deliver an item
+    double time = (x/flight_speed) + DELIVERY_TIME_SEC; // Approximate time required to deliver an item
+
     return time;
 }
 
@@ -124,6 +111,7 @@ Trajectory::call_mincost(std::vector<mission_waypoint_t> uploadedWpsList, int nu
     int n = 0;
     int completed[num_waypoints+1] = {0};
     double energy = 0;
+
     //Set the starting payload
     double payload_weight=0;
     for (int i=0; i<num_waypoints+1; i++){
@@ -161,9 +149,11 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
             }
         }
     }
-    if(is_final != true){
+
+    if (is_final != true){
         cost+=kmin;
     }
+
     return std::make_tuple(np, cost, is_final);
 }
 
@@ -210,8 +200,7 @@ Trajectory::calc_energy_use(double alt1, double alt2, double lat1, double lat2, 
 
     double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                     (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
-    double time = (x)/(flight_speed);
-    time += 5; // Approximate time required to deliver and item
+    double time = (x/flight_speed) + DELIVERY_TIME_SEC; // Approximate time required to deliver an item
 
     double power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
     double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
@@ -225,10 +214,11 @@ Trajectory::update_trajectory(mission_s mission)
     vector<mission_waypoint_t> uploadedWpsList;
     vector<mission_waypoint_t> finalWpsList;
     mission_waypoint_t oneWaypoint;
-    double** local_cost_array;
+    double** local_cost_array, ** energy_array;
     double cost, energy;
     bool write_failed = false;
     int numItems = mission.count;
+    int numOfWaypoints;
 
     printf("Mission Count is: %d\n", numItems);
 
