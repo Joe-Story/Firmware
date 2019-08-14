@@ -61,7 +61,7 @@
 
 using namespace std;
 
-#include "trajectory.cpp"
+#include "trajectory.h"
 
 Mission::Mission(Navigator *navigator) :
 	MissionBlock(navigator),
@@ -1628,9 +1628,10 @@ Mission::check_mission_valid(bool force)
 	if ((!_home_inited && _navigator->home_position_valid()) || force) {
 
                 MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
+		Trajectory _trajectory;
                 PX4_INFO("Check Mission Valid\n");
 
-                update_trajectory(_mission);
+                _trajectory.update_trajectory(_mission);
 
 		_navigator->get_mission_result()->valid =
 			_missionFeasibilityChecker.checkMissionFeasible(_mission,
