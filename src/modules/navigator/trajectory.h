@@ -5,8 +5,11 @@
  * @author Vasileios Tsoutsouras
  */
 
+#pragma once
+
 #include "mission_block.h"
 #include "mission_feasibility_checker.h"
+//#include "mavlink/mavlink_mission.h"
 #include "navigator_mode.h"
 
 #include <float.h>
@@ -64,7 +67,7 @@ class DRONE{
         double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                         (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
         double time = (x)/(flight_speed);
-        time += 5; // Approximate time required to deliver and item
+        //time += 5; // Approximate time required to deliver and item
 
         double power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
         double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
@@ -100,7 +103,7 @@ class WAYPOINTS{
                         (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
 
         double time = (x)/(flight_speed);
-        time += 5; // Approximate time required to deliver an item
+        //time += 5; // Approximate time required to deliver an item
         return time;
     }
 
