@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <px4_module_params.h>
 
 using namespace std;
 
@@ -42,6 +43,51 @@ using namespace std;
 Trajectory::Trajectory()
 {
 }
+
+//int update_mission(dm_item_t dataman_id, uint16_t count, int32_t seq){
+//    mission_s mission{};
+
+//    mission.timestamp = hrt_absolute_time();
+//    mission.dataman_id = dataman_id;
+//    mission.count = count;
+//    mission.current_seq = seq;
+
+//    int dm_lock_ret = dm_lock(DM_KEY_MISSION_STATE);
+//    if (dm_lock_ret != 0) {
+//            PX4_ERR("DM_KEY_MISSION_STATE lock failed");
+//    }
+
+//    int res = dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
+
+//    /* unlock MISSION_STATE item */
+//    if (dm_lock_ret == 0) {
+//            dm_unlock(DM_KEY_MISSION_STATE);
+//    }
+//    if (res == sizeof(mission_s)) {
+//        /* update active mission state */
+//        //_dataman_id = dataman_id;
+//        //_count[MAV_MISSION_TYPE_MISSION] = count;
+//        //_current_seq = seq;
+//        //_my_dataman_id = _dataman_id;
+//        orb_advert_t _offboard_mission_pub = nullptr;
+
+//        orb_publish(ORB_ID(mission), _offboard_mission_pub, &mission);
+
+//        /* mission state saved successfully, publish offboard_mission topic */
+////        if (_offboard_mission_pub == nullptr) {
+////                _offboard_mission_pub = orb_advertise(ORB_ID(mission), &mission);
+
+////        } else {
+////                orb_publish(ORB_ID(mission), _offboard_mission_pub, &mission);
+////        }
+//        return PX4_OK;
+//    }
+//    else {
+//        PX4_ERR("WPM: can't save mission state");
+//        return PX4_ERROR;
+//    }
+//    return 0;
+//}
 
 double
 Trajectory::calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed)
@@ -80,6 +126,7 @@ Trajectory::calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, 
     double time = (x/flight_speed) + DELIVERY_TIME_SEC; // Approximate time required to deliver an item
 
     double power;
+    //Object
     /*
     power = pow(mass+bat_mass+payload,3);
     printf("DEBUG0 power = %f\n",power);
@@ -94,7 +141,7 @@ Trajectory::calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, 
     printf("DEBUG3 power = %f\n",power);
     */
     //power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
-    power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*1.225*0.568489194) );
+    power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*1.225*0.568489194) ); //Calculate the rotor area?
     //printf("DEBUG4 power = %f\n",power);
 
     double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
@@ -356,6 +403,17 @@ Trajectory::update_trajectory(mission_s mission)
     int numItems = mission.count;
     int numOfWaypoints;
 
+    //Find the maximum horizontal speed
+    float _param_xy_vel_cruise{0.0f};
+    float _param_xy_vel_max{0.0f};
+    param_t _handle_param_xy_vel_cruise = param_find("MPC_XY_CRUISE");
+    param_t _handle_param_xy_vel_max = param_find("MPC_XY_VEL_MAX");
+    param_get(_handle_param_xy_vel_cruise, &_param_xy_vel_cruise);
+    param_get(_handle_param_xy_vel_max, &_param_xy_vel_max);
+    double max_speed;
+    max_speed = std::min(_param_xy_vel_cruise, _param_xy_vel_max);
+    printf("Max speed is %f\n", max_speed);
+
     printf("Mission Count is: %d\n", numItems);
 
     if (numItems > 0){
@@ -416,7 +474,6 @@ Trajectory::update_trajectory(mission_s mission)
         printf("\nCalculating best flight path:\n");
 
         std::tie (cost, energy, finalWpsList) = calc_solution(uploadedWpsList, numOfWaypoints, finalWpsList);
-        cost += 3*numOfWaypoints; /* What is this ? */
 
         printf("\nMinimum cost is %f seconds\n", (double) cost);
         printf("Battery usage is %f %\n", (double) energy);
@@ -431,6 +488,8 @@ Trajectory::update_trajectory(mission_s mission)
         /* INSERT CODE HERE */
 
         //Clear previous items from dataman
+        //update_mission((dm_item_t)mission.dataman_id, mission.count, mission.current_seq);
+
 //                    for (int i=0; i < numItems; i++){
 //                        dm_lock(DM_KEY_WAYPOINTS_OFFBOARD_0);
 //                        dm_lock(DM_KEY_WAYPOINTS_OFFBOARD_1);
@@ -459,7 +518,7 @@ Trajectory::update_trajectory(mission_s mission)
 
         //Print the entire contents of the dataman file system
         printf("Final Trajectory:\n");
-        for (int i = 0; i < numItems; i++){
+        for (int i = 0; i < 8; i++){
             struct mission_item_s mission_item {};
             if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
                 /* error reading, mission is invalid */

@@ -5,6 +5,8 @@
  * @author Vasileios Tsoutsouras
  */
 
+#pragma once
+
 #include "mission_block.h"
 #include "mission_feasibility_checker.h"
 #include "navigator_mode.h"
