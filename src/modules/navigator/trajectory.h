@@ -18,6 +18,11 @@
 #include <tuple>
 #include <vector>
 
+const double earth_radius = 6371000; //metres;
+const double pi = 3.1415926;
+const double g = 9.81; //ms^-2
+const double rho = 1.225; //Density of air in kgm^-3
+
 typedef struct mission_waypoint_struct {
         mission_item_s waypoint;
         int originalIndex;
@@ -60,11 +65,6 @@ class Trajectory
         const double bat_energy = 81.3; // Wh
         const double bat_mass = 0; // kg
         const double efficiency = 100.0; // %
-
-        const double earth_radius = 6371000; //metres;
-        const double pi = 3.1415926;
-        const double g = 9.81; //ms^-2
-        const double rho = 1.225; //Density of air in kgm^-3
 
         //Calculates a 2D cost array based on the cost function used
         double** calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array);
