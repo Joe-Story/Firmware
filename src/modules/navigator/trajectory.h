@@ -73,6 +73,10 @@ class Trajectory
         //Finds the nearest neighbour that hasn't been visited
         std::tuple<int, double, bool> least(int p, int num_waypoints, int completed[], double ** cost_array, double cost);
 
+        //Finds a close to optimal route using the 'Simulateted Annealing' algorithm
+        std::tuple <double, double, std::vector<mission_waypoint_t>>
+        solution_sa(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int visited[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array);
+
         //Finds a close to optimal route using the 'Greedy' method
         std::tuple <double, double, std::vector<mission_waypoint_t>> solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight);
 

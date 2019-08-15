@@ -181,6 +181,42 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
     return std::make_tuple(np, cost, is_final);
 }
 
+//Finds a close to optimal route using the 'Simulateted Annealing' algorithm
+std::tuple <double, double, std::vector<mission_waypoint_t>>
+Trajectory::solution_sa(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int visited[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array)
+{
+    int curIter, iterationsMax = 100;
+    bool terminate = false;
+    double cost, energy;
+    //double speed = 5.0;
+
+
+
+    /* Initialise structures */
+
+    while (terminate == false) {
+
+        for (curIter=0; curIter < iterationsMax; curIter++) {
+            /* Generate new solution */
+
+            /* Calculate feasibilit and cost */
+
+            /* Check improvement */
+
+            /* Check acceptance */
+
+        }
+
+        /* Evaluate termination condition */
+        terminate = true;
+
+        /* Adjust temperature */
+
+    }
+
+    return std::make_tuple(cost, energy, finalWpsList);
+}
+
 //Finds a close to optimal route using the 'Greedy' method
 std::tuple <double, double, std::vector<mission_waypoint_t>>
 Trajectory::solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int visited[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight)
