@@ -167,14 +167,14 @@ Trajectory::calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array)
 {
     double ** cost2d;
     double speed = 5.0;
-    cost2d = new double * [num_waypoints+2];
+    cost2d = new double * [num_waypoints+1];
 
-    for (int i=0; i < num_waypoints+1; i++){
-        cost2d[i] = new double [num_waypoints+2];
+    for (int i=0; i < num_waypoints; i++){
+        cost2d[i] = new double [num_waypoints+1];
     }
 
-    for (int i = 0; i < num_waypoints+1; i++){
-        for (int t = 0; t < num_waypoints+1; t++){
+    for (int i = 0; i < num_waypoints; i++){
+        for (int t = 0; t < num_waypoints; t++){
             cost2d[i][t] = calc_flight_time(array[i].waypoint, array[t].waypoint, speed);
         }
     }
@@ -451,23 +451,29 @@ Trajectory::update_trajectory(mission_s mission)
         //Clear previous items from dataman
         //update_mission((dm_item_t)mission.dataman_id, mission.count, mission.current_seq);
 
-        //dm_lock(DM_KEY_WAYPOINTS_OFFBOARD_0);
-        //dm_lock(DM_KEY_WAYPOINTS_OFFBOARD_1);
-        //dm_clear(DM_KEY_WAYPOINTS_OFFBOARD_0);
-        //dm_clear(DM_KEY_WAYPOINTS_OFFBOARD_1);
-        //dm_clear(DM_KEY_WAYPOINTS_OFFBOARD_1);
-        //dm_unlock(DM_KEY_WAYPOINTS_OFFBOARD_0);
-        //dm_unlock(DM_KEY_WAYPOINTS_OFFBOARD_1);
-
         //Write the optimal trajectory to the first memory locations in dataman
         for (int i=0; i < numOfWaypoints; i++){
             dm_lock(DM_KEY_MISSION_STATE);
             write_failed = dm_write((dm_item_t)mission.dataman_id, i,
-                                          DM_PERSIST_POWER_ON_RESET, &finalWpsList[i].waypoint,
+                                          DM_PERSIST_VOLATILE, &finalWpsList[i].waypoint,
                                           sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
             if (write_failed) {
                 PX4_WARN("My Write failed");
-                //printf("Tried to write index %d: with original index %d\n", temp_counter, uploadedWpsList[waypointsCnt-1-waypointsIndex].originalIndex);
+            }
+            dm_unlock(DM_KEY_MISSION_STATE);
+        }
+
+        //Clear remaining items from dataman
+        mission_item_s clear;
+        clear.nav_cmd = 20;
+        clear.altitude = 20;
+        for (int i=numOfWaypoints; i<numItems; i++){
+            dm_lock(DM_KEY_MISSION_STATE);
+            write_failed = dm_write((dm_item_t)mission.dataman_id, i,
+                                          DM_PERSIST_VOLATILE, &clear,
+                                          sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
+            if (write_failed) {
+                PX4_WARN("My Write failed");
             }
             dm_unlock(DM_KEY_MISSION_STATE);
         }
