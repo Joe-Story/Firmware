@@ -26,7 +26,14 @@ const double rho = 1.225; //Density of air in kgm^-3
 typedef struct mission_waypoint_struct {
         mission_item_s waypoint;
         int originalIndex;
+        double departureSpeed;
 } mission_waypoint_t;
+
+typedef struct trajectory_cost_struct {
+        double requiredEnergy;
+        int missedDeadlines;
+        double avgDelay;
+} trajectory_cost_t;
 
 typedef struct waypoints_struct {
     int id;
@@ -70,20 +77,19 @@ class Trajectory
         double** calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array);
 
         //Sets up all the variables required for the mincost function, and returns the estimated minimum cost route
-        std::tuple<double, double, std::vector<mission_waypoint_t>> calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, std::vector<mission_waypoint_t> finalWpsList);
+        std::tuple<double, double, std::vector<mission_waypoint_t>> calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints);
 
         //Finds the nearest neighbour that hasn't been visited
         std::tuple<int, double, bool> least(int p, int num_waypoints, int completed[], double ** cost_array, double cost);
 
-        //Finds a close to optimal route using the 'Simulateted Annealing' algorithm
-        std::tuple <double, double, std::vector<mission_waypoint_t>>
-        solution_sa(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int visited[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array);
+        //Finds a close to optimal route using the 'Simulated Annealing' algorithm
+        std::tuple <double, double> solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix);
 
         //Finds a close to optimal route using the 'Greedy' method
         std::tuple <double, double, std::vector<mission_waypoint_t>> solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight);
 
         //Finds an optimal route using the 'Brute Force' method
-        void solution_bruteforce (int level, int maxLevel, int *trajectory, int *visitedNodes, std::vector<mission_waypoint_t> uploadedWpsList, int *numOfTajectories, double ** cost_array);
+        void solution_bruteforce(int level, int maxLevel, int *trajectory, int *visitedNodes, std::vector<mission_waypoint_t> uploadedWpsList, int *numOfTrajectories, double *departureSpeedMatrix, trajectory_cost_t *solutionTrajCost, int *solutionTrajMatrix);
 
         //Calculate the distance between two waypoints in spherical polar coordinates (latitude, longitude, and altitude)
         double calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed);
@@ -93,4 +99,6 @@ class Trajectory
 
         //Calculate an estimate of the battery percentage used between two waypoints
         double calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed, double payload);
+
+        trajectory_cost_t calculateTrajectoryCost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int trajectoryMatrix[], double speedMatrix[]);
 };
