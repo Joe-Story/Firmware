@@ -182,12 +182,12 @@ Trajectory::calc_cost(int num_waypoints, std::vector<mission_waypoint_t> array)
     //Print the 2D Cost array
     std::cout << "2D Cost Array:" << std::endl;
 
-    for (int i = 0; i < num_waypoints+1; i++){
+    for (int i = 0; i < num_waypoints; i++){
         std::cout << "[";
-        for (int t = 0; t < num_waypoints; t++){
+        for (int t = 0; t < num_waypoints-1; t++){
             std::cout << cost2d[i][t] << ",  ";
         }
-        std::cout << cost2d[i][num_waypoints];
+        std::cout << cost2d[i][num_waypoints-1];
         std::cout << "]" << std::endl;
     }
     std::cout << "" << std::endl;
@@ -203,7 +203,7 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
     int min=0,kmin;
     bool is_final = true;
 
-    for (i=0;i<num_waypoints+1;i++){
+    for (i=0;i<num_waypoints;i++){
         if((cost_array[p][i]>=0.05)&&(completed[i]==0)){ //Check that this is correct
             //For first iteration, pick any point
             if (min == 0){
@@ -230,7 +230,7 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
     return std::make_tuple(np, cost, is_final);
 }
 
-//Finds a close to optimal route using the 'Greedy' method
+//Finds a close to optimal route using the 'nearest neighbour' method
 std::tuple <double, double, std::vector<mission_waypoint_t>>
 Trajectory::solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int visited[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight)
 {
@@ -314,12 +314,6 @@ Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int n
     int visited[num_waypoints] = {0}, trajectory[num_waypoints] = {0}, visitedNodes[num_waypoints] = {0};
     double energy = 0;
     double **cost_array;
-
-    //Create the 2D dynamic and energy cost array
-    cost_array = new double * [num_waypoints+1];
-    for (int i=0; i < num_waypoints+1; i++){
-        cost_array[i] = new double [num_waypoints+1];
-    }
 
     //Update takeoff and land position using PX4 rather than MAVSDK
     /* INSERT CODE HERE */
@@ -442,7 +436,7 @@ Trajectory::update_trajectory(mission_s mission)
 
         std::tie (cost, energy, finalWpsList) = calc_solution(uploadedWpsList, numOfWaypoints, finalWpsList);
 
-        printf("\nMinimum cost is %f seconds\n", (double) cost);
+        printf("\nMinimum cost is %f seconds\n", cost);
         printf("Battery usage is %f %\n", (double) energy);
 
         //Print the final trajectory
