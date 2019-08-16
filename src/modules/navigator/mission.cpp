@@ -1625,27 +1625,27 @@ Mission::set_current_mission_item()
 void
 Mission::check_mission_valid(bool force)
 {
-	if ((!_home_inited && _navigator->home_position_valid()) || force) {
+    if ((!_home_inited && _navigator->home_position_valid()) || force) {
 
-                MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
-		Trajectory _trajectory;
-                PX4_INFO("Check Mission Valid\n");
+        MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
+        Trajectory _trajectory;
+        PX4_INFO("Check Mission Valid\n");
 
-                _trajectory.update_trajectory(_mission);
+        //_trajectory.update_trajectory(_mission);
 
-		_navigator->get_mission_result()->valid =
-			_missionFeasibilityChecker.checkMissionFeasible(_mission,
-					_param_mis_dist_1wp.get(),
-					_param_mis_dist_wps.get(),
-					_navigator->mission_landing_required());
+        _navigator->get_mission_result()->valid =
+                _missionFeasibilityChecker.checkMissionFeasible(_mission,
+                                                                _param_mis_dist_1wp.get(),
+                                                                _param_mis_dist_wps.get(),
+                                                                _navigator->mission_landing_required());
 
-		_navigator->get_mission_result()->seq_total = _mission.count;
-		_navigator->increment_mission_instance_count();
-		_navigator->set_mission_result_updated();
-		_home_inited = _navigator->home_position_valid();
+        _navigator->get_mission_result()->seq_total = _mission.count;
+        _navigator->increment_mission_instance_count();
+        _navigator->set_mission_result_updated();
+        _home_inited = _navigator->home_position_valid();
 
-		// find and store landing start marker (if available)
-		find_mission_land_start();
+        // find and store landing start marker (if available)
+        find_mission_land_start();
         }
 }
 
