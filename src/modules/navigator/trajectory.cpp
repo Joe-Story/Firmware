@@ -105,12 +105,6 @@ Trajectory::calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2,
 
     double time = (x/flight_speed); // Approximate time required to deliver an item
 
-    /* What is this ?
-    if (time >= 2.9 && time <= 3.1){
-        return 3;
-    }
-    */
-
     return time;
 }
 
@@ -236,7 +230,7 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
 
 trajectory_cost_t
 Trajectory::calculateTrajectoryCost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int trajectoryMatrix[], double speedMatrix[]) {
-    trajectory_cost_t curTrajCost = {0};
+    trajectory_cost_t curTrajCost = {.requiredEnergy = 0.0, .missedDeadlines = 0, .avgDelay = 0.0};
     int j;
     double sumOfMissedDelaysValues = 0;
     double arrival_at_j = 0;
@@ -261,35 +255,22 @@ Trajectory::calculateTrajectoryCost(std::vector<mission_waypoint_t> uploadedWpsL
     /* Add energy cost of returning to takeoff -- there is not deadline cost yet*/
     curTrajCost.requiredEnergy += Trajectory::calc_energy_use(uploadedWpsList[trajectoryMatrix[j]].waypoint, uploadedWpsList[num_waypoints].waypoint, speedMatrix[j], trajectory_payload);
     curTrajCost.avgDelay = sumOfMissedDelaysValues / curTrajCost.missedDeadlines;
-    // double trajectory_energy = 0;
-    // double trajectory_cost = 0;
-    // double trajectory_payload = uploadedWpsList[0].waypoint.payload_weight;
-
-    // for (j=0; j<maxLevel-1; j++) {
-    //     trajectory_energy += Trajectory::calc_energy_use(uploadedWpsList[trajectory[j]].waypoint, uploadedWpsList[trajectory[j+1]].waypoint, departureSpeed, trajectory_payload);
-    //     trajectory_cost += Trajectory::calc_flight_time(uploadedWpsList[trajectory[j]].waypoint, uploadedWpsList[trajectory[j+1]].waypoint, departureSpeed);
-    //     trajectory_payload -= uploadedWpsList[trajectory[j+1]].waypoint.payload_weight;
-    // }
-
-    // trajectory_energy += Trajectory::calc_energy_use(uploadedWpsList[trajectory[j]].waypoint, uploadedWpsList[maxLevel].waypoint, departureSpeed, trajectory_payload);
-    // trajectory_cost += Trajectory::calc_flight_time(uploadedWpsList[trajectory[j]].waypoint, uploadedWpsList[maxLevel].waypoint, departureSpeed);
-
 
     return curTrajCost;
 }
 
 //Finds a close to optimal route using the 'Simulated Annealing' algorithm
-std::tuple <double, double>
+trajectory_cost_t
 Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix)
 {
     int curIter, iterationsMax = 100;
     bool terminate = false;
-    double cost=0, minEnergy=0, newEnergy=0;
+    //double cost=0, minEnergy=0, newEnergy=0;
     int random_index, tmpTrajPoint;
-    int tmpTrajMatrix[num_waypoints] = {0};
-    //double tmpSpeedMatrix[num_waypoints] = {5.0};
+    int tmpTrajMatrix[num_waypoints];
+    double tmpSpeedMatrix[num_waypoints];
     double accProbability, probThreshold=0.5, Temperature=0.5;
-    std::vector<mission_waypoint_t> finalWpsList;
+    trajectory_cost_t curTrajCost, curSolutionTrajCost;
 
     /* Initialise structures */
     std::srand ( unsigned ( std::time(0) ) );
@@ -305,12 +286,13 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
 
     tmpTrajMatrix[0] = 0;
     solutionTrajMatrix[0] = 0;
-    for (int i=1; i<=num_waypoints; i++) {
+    for (int i=0; i<=num_waypoints; i++) {
         tmpTrajMatrix[i] = tempVector[i];
         solutionTrajMatrix[i] = tempVector[i];
+        tmpSpeedMatrix[i] = 5.0;
     }
 
-    //std::tie (cost, minEnergy) = Trajectory::calculateTrajectoryCost(uploadedWpsList, num_waypoints, solutionTrajMatrix, tmpSpeedMatrix);
+    curSolutionTrajCost = Trajectory::calculateTrajectoryCost(uploadedWpsList, num_waypoints, solutionTrajMatrix, tmpSpeedMatrix);
 
     while (terminate == false) {
 
@@ -326,12 +308,14 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
             tmpTrajMatrix[random_index] = tmpTrajMatrix[random_index+1];
             tmpTrajMatrix[random_index+1] = tmpTrajPoint;
 
+            /* get random speed too */
+
             /* Calculate feasibilit and cost */
-            //std::tie (cost, newEnergy) = Trajectory::calculateTrajectoryCost(uploadedWpsList, num_waypoints, tmpTrajMatrix, tmpSpeedMatrix);
+            curTrajCost = Trajectory::calculateTrajectoryCost(uploadedWpsList, num_waypoints, tmpTrajMatrix, tmpSpeedMatrix);
 
             /* Check improvement and acceptance */
-            if (newEnergy < minEnergy) {
-                minEnergy = newEnergy;
+            if (curTrajCost.requiredEnergy < curSolutionTrajCost.requiredEnergy) {
+                curSolutionTrajCost = curTrajCost;
 
                 for (int i=1; i<=num_waypoints; i++) {
                     solutionTrajMatrix[i] = tmpTrajMatrix[i];
@@ -340,10 +324,10 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
             } else {
                 /* if random [ 0, 1 ] ≥ accProbability then accept -- Don't like that */
                 /* Metropolis rule */
-                accProbability = exp(-(newEnergy-minEnergy/Temperature));
+                accProbability = exp(-((curTrajCost.requiredEnergy < curSolutionTrajCost.requiredEnergy)/Temperature));
 
                 if (accProbability > probThreshold) {
-                    minEnergy = newEnergy;
+                    curSolutionTrajCost = curTrajCost;
 
                     for (int i=1; i<=num_waypoints; i++) {
                         solutionTrajMatrix[i] = tmpTrajMatrix[i];
@@ -358,13 +342,7 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
         /* Adjust temperature */
     }
 
-    /*
-    for (int i=0; i<num_waypoints; i++) {
-        finalWpsList.push_back(uploadedWpsList[solutionTrajMatrix[i]]); // Initialize with the waypoints index
-    }
-    */
-
-    return std::make_tuple(cost, minEnergy);
+    return curSolutionTrajCost;
 }
 
 //Finds a close to optimal route using the 'Greedy' method
@@ -446,33 +424,24 @@ Trajectory::solution_bruteforce (int level, int maxLevel, int *trajectory, int *
 std::tuple<double, double, std::vector<mission_waypoint_t>>
 Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints)
 {
-    int i, numOfTrajectories=0, trajectory[num_waypoints] = {0}, visitedNodes[num_waypoints] = {0}, solutionTrajMatrix[num_waypoints] = {0};
+    int i, numOfTrajectories=0, trajectory[num_waypoints], visitedNodes[num_waypoints], solutionTrajMatrix[num_waypoints];
     std::vector<mission_waypoint_t> finalWpsList;
-    double departureSpeedMatrix[num_waypoints] = {5.0}, minEnergy = INFINITY, minCost = INFINITY;
+    double departureSpeedMatrix[num_waypoints], minEnergy = INFINITY, minCost = INFINITY;
     trajectory_cost_t solutionTrajCost = {.requiredEnergy = INFINITY, .missedDeadlines = num_waypoints, .avgDelay = 0.0};
-
-    //Update takeoff and land position using PX4 rather than MAVSDK
-    /* INSERT CODE HERE */
-
-    //Set the last point as the home position
-    /* INSERT CODE HERE */
 
     //Set the starting payload
     double takeoff_weight=0;
     for (i=0; i<num_waypoints; i++){
+        //printf("Before explicit init departureSpeedMatrix[i] is %f\n",departureSpeedMatrix[i]);
         departureSpeedMatrix[i] = 5.0;
+        trajectory[i] = 0;
+        visitedNodes[i] = 0;
+        solutionTrajMatrix[i] = 0;
         takeoff_weight += uploadedWpsList[i].waypoint.payload_weight;
     }
 
     printf("\nThe takeoff weight is: %f kg\n",(double) takeoff_weight);
     uploadedWpsList[0].waypoint.payload_weight = takeoff_weight;
-
-    /*
-    for (i=0; i < num_waypoints; i++) {
-		trajectory[i] = 0;
-		visitedNodes[i] = 0;
-	}
-    */
 
     /* Set takeoff as first point */
     trajectory[0] = 0;
@@ -489,7 +458,7 @@ Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int n
         finalWpsList[i].departureSpeed = departureSpeedMatrix[i];
     }
     printf("0\n");
-    
+
 	printf("Energy consumption: %f, number of missed deadlines: %d, Avg Delay %f\n\n",
 		solutionTrajCost.requiredEnergy, solutionTrajCost.missedDeadlines, solutionTrajCost.avgDelay);
 
