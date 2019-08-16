@@ -83,7 +83,7 @@ class Trajectory
         std::tuple<int, double, bool> least(int p, int num_waypoints, int completed[], double ** cost_array, double cost);
 
         //Finds a close to optimal route using the 'Simulated Annealing' algorithm
-        std::tuple <double, double> solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix);
+        trajectory_cost_t solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix);
 
         //Finds a close to optimal route using the 'Greedy' method
         std::tuple <double, double, std::vector<mission_waypoint_t>> solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight);
