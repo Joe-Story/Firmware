@@ -97,6 +97,9 @@ class Trajectory
         //Calculate an estimate of the maximum drone flight time in minutes
         double calc_max_flight_time(void);
 
+        //Command takeoff
+        bool takeoff_cmd(int num_waypoints);
+
         //Calculate an estimate of the battery percentage used between two waypoints
         double calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed, double payload);
 

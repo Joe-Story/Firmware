@@ -1628,10 +1628,10 @@ Mission::check_mission_valid(bool force)
     if ((!_home_inited && _navigator->home_position_valid()) || force) {
 
         MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
-        Trajectory _trajectory;
         PX4_INFO("Check Mission Valid\n");
 
-        //_trajectory.update_trajectory(_mission);
+        Trajectory _trajectory;
+        _trajectory.update_trajectory(_mission);
 
         _navigator->get_mission_result()->valid =
                 _missionFeasibilityChecker.checkMissionFeasible(_mission,

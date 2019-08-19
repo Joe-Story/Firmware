@@ -8,6 +8,7 @@
 #include "mission.h"
 #include "navigator.h"
 #include "navigation.h"
+#include "trajectory.h"
 
 #include <string.h>
 #include <drivers/drv_hrt.h>
@@ -16,11 +17,11 @@
 #include <systemlib/err.h>
 #include <lib/ecl/geo/geo.h>
 #include <navigator/navigation.h>
+#include <px4_module_params.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
 
-/*** SETUP FOR COST CALCULATOR CODE ***/
 #include <functional>
 #include <future>
 #include <memory>
@@ -32,63 +33,44 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <px4_module_params.h>
 
 using namespace std;
 
-#include "trajectory.h"
-
 double delivery_time = 5.0; /* How close to reality is this? */
+int started = 0;
 
-Trajectory::Trajectory()
+static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 = NAN)
 {
+        vehicle_command_s vcmd = {};
+        vcmd.timestamp = hrt_absolute_time();
+        vcmd.param1 = param1;
+        vcmd.param2 = param2;
+        vcmd.param3 = NAN;
+        vcmd.param4 = NAN;
+        vcmd.param5 = (double)NAN;
+        vcmd.param6 = (double)NAN;
+        vcmd.param7 = NAN;
+        vcmd.command = cmd;
+        vcmd.target_system = 1;
+        vcmd.target_component = 0;
+
+        orb_advert_t h = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd, vehicle_command_s::ORB_QUEUE_LENGTH);
+
+        return (h != nullptr);
 }
 
-//int update_mission(dm_item_t dataman_id, uint16_t count, int32_t seq){
-//    mission_s mission{};
+Trajectory::Trajectory(){
+}
 
-//    mission.timestamp = hrt_absolute_time();
-//    mission.dataman_id = dataman_id;
-//    mission.count = count;
-//    mission.current_seq = seq;
+//Instruct the drone to takeoff once all of the calculations are complete
+bool
+Trajectory::takeoff_cmd(int num_waypoints){
+    bool ret = false;
+    ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_MISSION_START, 1, num_waypoints);
+    return ret;
+}
 
-//    int dm_lock_ret = dm_lock(DM_KEY_MISSION_STATE);
-//    if (dm_lock_ret != 0) {
-//            PX4_ERR("DM_KEY_MISSION_STATE lock failed");
-//    }
-
-//    int res = dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
-
-//    /* unlock MISSION_STATE item */
-//    if (dm_lock_ret == 0) {
-//            dm_unlock(DM_KEY_MISSION_STATE);
-//    }
-//    if (res == sizeof(mission_s)) {
-//        /* update active mission state */
-//        //_dataman_id = dataman_id;
-//        //_count[MAV_MISSION_TYPE_MISSION] = count;
-//        //_current_seq = seq;
-//        //_my_dataman_id = _dataman_id;
-//        orb_advert_t _offboard_mission_pub = nullptr;
-
-//        orb_publish(ORB_ID(mission), _offboard_mission_pub, &mission);
-
-//        /* mission state saved successfully, publish offboard_mission topic */
-////        if (_offboard_mission_pub == nullptr) {
-////                _offboard_mission_pub = orb_advertise(ORB_ID(mission), &mission);
-
-////        } else {
-////                orb_publish(ORB_ID(mission), _offboard_mission_pub, &mission);
-////        }
-//        return PX4_OK;
-//    }
-//    else {
-//        PX4_ERR("WPM: can't save mission state");
-//        return PX4_ERROR;
-//    }
-//    return 0;
-//}
-
+//Calculate an estimate of the time taken to fly between waypoints
 double
 Trajectory::calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2, double flight_speed)
 {
@@ -103,7 +85,7 @@ Trajectory::calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2,
     double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                     (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
 
-    double time = (x/flight_speed); // Approximate time required to deliver an item
+    double time = (x/flight_speed) + delivery_time; // Approximate time required to deliver an item
 
     return time;
 }
@@ -126,23 +108,8 @@ Trajectory::calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, 
     double time = (x/flight_speed) + delivery_time; // Approximate time required to deliver an item
 
     double power;
-    //Object
-    /*
-    power = pow(mass+bat_mass+payload,3);
-    printf("DEBUG0 power = %f\n",power);
 
-    power = (pow(mass+bat_mass+payload,3)*pow(g,3));
-    printf("DEBUG1 power = %f\n",power);
-
-    power = (2*1.225*0.568489194);
-    printf("DEBUG2 power = %f\n",power);
-
-    power = (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) ;
-    printf("DEBUG3 power = %f\n",power);
-    */
-    //power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*rho*rotor_area) );
     power = sqrt( (pow(mass+bat_mass+payload,3)*pow(g,3)) / (2*1.225*0.568489194) ); //Calculate the rotor area?
-    //printf("DEBUG4 power = %f\n",power);
 
     double percent_used = (((power*time) / (bat_energy*3600)) * 100) / (efficiency/100);
 
@@ -310,7 +277,7 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
 
             /* get random speed too */
 
-            /* Calculate feasibilit and cost */
+            /* Calculate feasibility and cost */
             curTrajCost = Trajectory::calculateTrajectoryCost(uploadedWpsList, num_waypoints, tmpTrajMatrix, tmpSpeedMatrix);
 
             /* Check improvement and acceptance */
@@ -521,7 +488,6 @@ Trajectory::update_trajectory(mission_s mission)
                 if (oneWaypoint.waypoint.nav_cmd == 16){
                     printf("Waypoint weight is %f deadline is %f\n",oneWaypoint.waypoint.payload_weight,oneWaypoint.waypoint.deadline);
                     uploadedWpsList.push_back(oneWaypoint);
-                    //finalWpsList.push_back(oneWaypoint);
                     numOfWaypoints++;
                 }
             }
@@ -620,5 +586,9 @@ Trajectory::update_trajectory(mission_s mission)
             oneWaypoint.originalIndex = i;
             std::cout << "Index: " << oneWaypoint.originalIndex << ", " << oneWaypoint.waypoint.nav_cmd << ", " << oneWaypoint.waypoint.lat << ", " << oneWaypoint.waypoint.lon << std::endl;
         }
+
+        //Command the drone to takeoff, but only if the mission hasn't been completed yet
+        if (started == 1){takeoff_cmd(numOfWaypoints);}
+        started++;
     }
 }
