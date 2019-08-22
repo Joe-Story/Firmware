@@ -209,14 +209,11 @@ void Module::run()
     int error_counter = 0;
 
     FILE *fptr;
-    fptr = fopen("/home/joestory/src/Firmware/src/modules/thrust_logger/logged_data.txt", "w");
+    fptr = fopen("/home/joestory/src/Firmware/src/modules/thrust_logger/logged_data.txt", "w+");
     if(fptr == NULL){
-        printf("Error! File not opened ");
-        printf("");
+        PX4_INFO("Error! File not opened ");
         return;
     }
-
-    //fprintf(fptr, "%s", "Body Thrust: ");
 
     //Check to see if the drone is armed
     orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
@@ -226,6 +223,9 @@ void Module::run()
         orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
     }
 
+    //Start flight time clock
+    double start_time = hrt_absolute_time();
+    printf("Start time is: %f", start_time);
 
     while (arm.armed == true) {
         /* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
@@ -258,19 +258,15 @@ void Module::run()
 
                 fprintf(fptr, "%f , %f , %f , %f ,\n", (double)raw_act.output[0], (double)raw_act.output[1], (double)raw_act.output[2], (double)raw_act.output[3]);
 
-//                act.control[1] = raw_act.control[1];
-//                act.control[2] = raw_act.control[2];
-//                act.control[3] = raw_act.control[3];
-
-                //orb_publish(ORB_ID(actuator_outputs), act_pub, &act);
-
             }
-
-            /* there could be more file descriptors here, in the form like:
-             * if (fds[1..n].revents & POLLIN) {}
-             */
         }
     }
+
+    //Calculate the flight time (hrt is in microseconds)
+    double land_time = hrt_absolute_time();
+    double flight_time = (land_time - start_time)/1000000;
+    printf("Flight time is: %f", flight_time);
+    fprintf(fptr, "Flight Time, %f\n", flight_time);
 
     PX4_INFO("exiting");
 

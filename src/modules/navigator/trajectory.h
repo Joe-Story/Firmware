@@ -86,7 +86,7 @@ class Trajectory
         trajectory_cost_t solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix, double *solSpeedMatrix);
 
         //Finds a close to optimal route using the 'Greedy' method
-        std::tuple <double, double, std::vector<mission_waypoint_t>> solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], std::vector<mission_waypoint_t> finalWpsList, double ** cost_array, int n, double energy, double payload_weight);
+        trajectory_cost_t solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], double ** cost_array, int n, double energy, double payload_weight, int *solutionTrajCost);
 
         //Finds an optimal route using the 'Brute Force' method
         void solution_bruteforce(int level, int maxLevel, int *trajectory, int *visitedNodes, std::vector<mission_waypoint_t> uploadedWpsList, int *numOfTrajectories, double *departureSpeedMatrix, trajectory_cost_t *solutionTrajCost, int *solutionTrajMatrix, bool *solutionChanged);
