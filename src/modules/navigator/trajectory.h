@@ -82,11 +82,11 @@ class Trajectory
         //Finds the nearest neighbour that hasn't been visited
         std::tuple<int, double, bool> least(int p, int num_waypoints, int completed[], double ** cost_array, double cost);
 
-        //Finds a close to optimal route using the 'Simulated Annealing' algorithm
-        trajectory_cost_t solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix, double *solSpeedMatrix);
+        //Finds a close to optimal route using the 'Simulated Annealing' method
+        trajectory_cost_t solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix, double *solSpeedMatrix, int tempSol[]);
 
-        //Finds a close to optimal route using the 'Greedy' method
-        trajectory_cost_t solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], double ** cost_array, int n, double energy, double payload_weight, int *solutionTrajCost);
+        //Finds a close to optimal route using the 'Nearest Neighbour' method
+        trajectory_cost_t solution_nn(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int completed[], double ** cost_array, int n, double energy, double payload_weight, int *solutionTrajCost);
 
         //Finds an optimal route using the 'Brute Force' method
         void solution_bruteforce(int level, int maxLevel, int *trajectory, int *visitedNodes, std::vector<mission_waypoint_t> uploadedWpsList, int *numOfTrajectories, double *departureSpeedMatrix, trajectory_cost_t *solutionTrajCost, int *solutionTrajMatrix, bool *solutionChanged);

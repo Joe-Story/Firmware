@@ -198,7 +198,7 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
     return std::make_tuple(np, cost, is_final);
 }
 
-//Calculates
+//Calculates the energy, missed deadlines, and average deadline delay
 trajectory_cost_t
 Trajectory::calculateTrajectoryCost(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int trajectoryMatrix[], double speedMatrix[]) {
     trajectory_cost_t curTrajCost = {.requiredEnergy = 0.0, .missedDeadlines = 0, .avgDelay = 0.0};
@@ -232,7 +232,7 @@ Trajectory::calculateTrajectoryCost(std::vector<mission_waypoint_t> uploadedWpsL
 
 //Finds a close to optimal route using the 'Simulated Annealing' algorithm
 trajectory_cost_t
-Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix, double *solSpeedMatrix)
+Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix, double *solSpeedMatrix, int tempSol[])
 {
     int curIter, iterationsMax = 1000;
     bool terminate = false;
@@ -249,6 +249,9 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
     for (int i=1; i<=num_waypoints; i++) {
         tempVector.push_back(i); // Initialize with the waypoints index
     }
+//    for (int i=1; i<num_waypoints; i++){
+//        tempVector.push_back(tempSol[i]);
+//    }
 
     // using built-in random generator to generate initial point
     std::random_shuffle (tempVector.begin(), tempVector.end());
@@ -327,7 +330,7 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
 
 //Finds a close to optimal route using the 'Nearest Neighbour' method
 trajectory_cost_t
-Trajectory::solution_mincost(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int visited[], double ** cost_array, int n, double energy, double payload_weight, int *solutionTrajMatrix)
+Trajectory::solution_nn(int position, std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, double cost, int visited[], double ** cost_array, int n, double energy, double payload_weight, int *solutionTrajMatrix)
 {
     int nposition;
     bool is_final = false;
@@ -357,7 +360,7 @@ Trajectory::solution_mincost(int position, std::vector<mission_waypoint_t> uploa
         curSolutionTrajCost = Trajectory::calculateTrajectoryCost(uploadedWpsList, num_waypoints, solutionTrajMatrix, speedMatrix);
         return curSolutionTrajCost;
     } else {
-        return solution_mincost(nposition, uploadedWpsList, num_waypoints, cost, visited, cost_array, n, energy, payload_weight, solutionTrajMatrix);
+        return solution_nn(nposition, uploadedWpsList, num_waypoints, cost, visited, cost_array, n, energy, payload_weight, solutionTrajMatrix);
     }
 }
 
@@ -426,74 +429,55 @@ Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int n
 
 
 
-    /*** BRUTE FORCE ***/
+    /*** CALL BRUTE FORCE ***/
+    //Limits the number of waypoints to 10, otherwise it will take too long
+    if (num_waypoints<=11){
+        for (double tmpSpeed = MIN_FLIGHT_VELOCITY; tmpSpeed <= MAX_FLIGHT_VELOCITY; tmpSpeed += INC_FLIGHT_VELOCITY) {
+            solutionChanged = false;
 
-    for (double tmpSpeed = MIN_FLIGHT_VELOCITY; tmpSpeed <= MAX_FLIGHT_VELOCITY; tmpSpeed += INC_FLIGHT_VELOCITY) {
-        solutionChanged = false;
+            for (i=0; i<num_waypoints; i++){
+                departureSpeedMatrix[i] = tmpSpeed;
+                trajectory[i] = 0;
+                visitedNodes[i] = 0;
+                solutionTrajMatrix[i] = 0;
+            }
 
-        for (i=0; i<num_waypoints; i++){
-            departureSpeedMatrix[i] = tmpSpeed;
-            trajectory[i] = 0;
-            visitedNodes[i] = 0;
-            solutionTrajMatrix[i] = 0;
+            /* Set takeoff as first point */
+            trajectory[0] = 0;
+            visitedNodes[0] = 1;
+
+            Trajectory::solution_bruteforce (1, num_waypoints, trajectory, visitedNodes, uploadedWpsList, &numOfTrajectories, departureSpeedMatrix, &solutionTrajCost, solutionTrajMatrix, &solutionChanged);
+
+            if (solutionChanged == true) {
+                solutionSpeed = tmpSpeed;
+            }
+
         }
 
-        /* Set takeoff as first point */
-        trajectory[0] = 0;
-        visitedNodes[0] = 1;
+        printf("\nBrute force evaluated %d routes\n",numOfTrajectories);
+        printf("Chosen one is:\n");
 
-        Trajectory::solution_bruteforce (1, num_waypoints, trajectory, visitedNodes, uploadedWpsList, &numOfTrajectories, departureSpeedMatrix, &solutionTrajCost, solutionTrajMatrix, &solutionChanged);
-
-        if (solutionChanged == true) {
-            solutionSpeed = tmpSpeed;
+        for (i=0; i<num_waypoints; i++) {
+            printf("%d--->", solutionTrajMatrix[i]);
+            finalWpsList.push_back(uploadedWpsList[solutionTrajMatrix[i]]); // Initialize with the waypoints index
+            finalWpsList[i].departureSpeed = solutionSpeed; //departureSpeedMatrix[i];
         }
+        printf("0\n");
+
+        printf("Energy consumption: %f, number of missed deadlines: %d, Avg Delay %f and speed %f\n\n",
+            solutionTrajCost.requiredEnergy, solutionTrajCost.missedDeadlines, solutionTrajCost.avgDelay, solutionSpeed);
+
+        finalWpsList.push_back(uploadedWpsList[i]); // Initialize with the waypoints index
+        finalWpsList[i].departureSpeed = 0;
 
     }
-
-    printf("\nBrute force evaluated %d routes\n",numOfTrajectories);
-    printf("Chosen one is:\n");
-
-    for (i=0; i<num_waypoints; i++) {
-        printf("%d--->", solutionTrajMatrix[i]);
-        finalWpsList.push_back(uploadedWpsList[solutionTrajMatrix[i]]); // Initialize with the waypoints index
-        finalWpsList[i].departureSpeed = solutionSpeed; //departureSpeedMatrix[i];
-    }
-    printf("0\n");
-
-	printf("Energy consumption: %f, number of missed deadlines: %d, Avg Delay %f and speed %f\n\n",
-		solutionTrajCost.requiredEnergy, solutionTrajCost.missedDeadlines, solutionTrajCost.avgDelay, solutionSpeed);
-
-	finalWpsList.push_back(uploadedWpsList[i]); // Initialize with the waypoints index
-    finalWpsList[i].departureSpeed = 0;
-
-
-
-    /*** SIMULATED ANNEALING ***/
-
-    for (i=0; i<num_waypoints; i++){
-        //printf("Before explicit init departureSpeedMatrix[i] is %f\n",departureSpeedMatrix[i]);
-        departureSpeedMatrix[i] = 5.0;
-        trajectory[i] = 0;
-        visitedNodes[i] = 0;
-        solutionTrajMatrix[i] = 0;
+    else{
+        PX4_WARN("NUMBER OF WAYPOINTS IS TOO HIGH");
     }
 
-    solutionTrajCost = Trajectory::solution_sa(uploadedWpsList, num_waypoints, solutionTrajMatrix, departureSpeedMatrix);
-
-    printf("SA Chosen solution is:\n");
-    for (i=0; i<num_waypoints; i++) {
-        printf("%d--->", solutionTrajMatrix[i]);
-        finalWpsList.push_back(uploadedWpsList[solutionTrajMatrix[i]]); // Initialize with the waypoints index
-        finalWpsList[i].departureSpeed = departureSpeedMatrix[i];
-    }
-    printf("0\n");
-
-	printf("Energy consumption: %f, number of missed deadlines: %d, Avg Delay %f\n\n",
-		solutionTrajCost.requiredEnergy, solutionTrajCost.missedDeadlines, solutionTrajCost.avgDelay);
 
 
-
-    /*** MINCOST ***/
+    /*** CALL MINCOST/NEAREST NEIGHBOUR ***/
 
     int n = 0, visited[num_waypoints] = {0};
     double cost_nearest = 0, energy_nearest = 0;
@@ -501,7 +485,7 @@ Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int n
     int mincostSolutionTrajMatrix[num_waypoints] = {0};
     //Calculate the 2D cost/time array (using spherical polar coordinates)
     cost_array = calc_cost(num_waypoints, uploadedWpsList);
-    solutionTrajCost = Trajectory::solution_mincost(0, uploadedWpsList, num_waypoints, cost_nearest, visited, cost_array, n, energy_nearest, takeoff_weight, mincostSolutionTrajMatrix);
+    solutionTrajCost = Trajectory::solution_nn(0, uploadedWpsList, num_waypoints, cost_nearest, visited, cost_array, n, energy_nearest, takeoff_weight, mincostSolutionTrajMatrix);
 
 
     //Call nearest neighbour solution
@@ -515,6 +499,37 @@ Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int n
 
     printf("Energy consumption: %f, number of missed deadlines: %d, Avg Delay %f\n\n",
         solutionTrajCost.requiredEnergy, solutionTrajCost.missedDeadlines, solutionTrajCost.avgDelay);
+
+    //Allow the Simulated Annealing algorithm to start with the nn solution
+    int tempSolution[num_waypoints+1];
+    for (int t=0; t<num_waypoints; t++){
+        tempSolution[t]=mincostSolutionTrajMatrix[t];
+    }
+
+
+
+    /*** CALL SIMULATED ANNEALING ***/
+
+    for (i=0; i<num_waypoints; i++){
+        //printf("Before explicit init departureSpeedMatrix[i] is %f\n",departureSpeedMatrix[i]);
+        departureSpeedMatrix[i] = 5.0;
+        trajectory[i] = 0;
+        visitedNodes[i] = 0;
+        solutionTrajMatrix[i] = 0;
+    }
+
+    solutionTrajCost = Trajectory::solution_sa(uploadedWpsList, num_waypoints, solutionTrajMatrix, departureSpeedMatrix, tempSolution);
+
+    printf("SA Chosen solution is:\n");
+    for (i=0; i<num_waypoints; i++) {
+        printf("%d--->", solutionTrajMatrix[i]);
+        finalWpsList.push_back(uploadedWpsList[solutionTrajMatrix[i]]); // Initialize with the waypoints index
+        finalWpsList[i].departureSpeed = departureSpeedMatrix[i];
+    }
+    printf("0\n");
+
+	printf("Energy consumption: %f, number of missed deadlines: %d, Avg Delay %f\n\n",
+		solutionTrajCost.requiredEnergy, solutionTrajCost.missedDeadlines, solutionTrajCost.avgDelay);
 
     return std::make_tuple(minCost, minEnergy, finalWpsList);
 }
@@ -665,8 +680,8 @@ Trajectory::update_trajectory(mission_s mission)
             std::cout << "Index: " << oneWaypoint.originalIndex << ", " << oneWaypoint.waypoint.nav_cmd << ", " << oneWaypoint.waypoint.lat << ", " << oneWaypoint.waypoint.lon << std::endl;
         }
 
-        //Command the drone to takeoff, but only if the mission hasn't been completed yet
-        //if (started == 1){takeoff_cmd(numOfWaypoints);}
+        //Command the drone to takeoff, but only if the mission hasn't been completed yet (only lets the drone fly once)
+        if (started == 1){takeoff_cmd(numOfWaypoints);}
         started++;
     }
 }
