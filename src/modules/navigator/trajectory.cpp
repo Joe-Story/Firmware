@@ -42,6 +42,7 @@ using namespace std;
 #define FLIGHT_VELOCITY_STEPS 15
 
 double delivery_time = 5.0; /* How close to reality is this? */
+double acceleration_time = 3.0;
 int started = 0;
 
 static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 = NAN)
@@ -90,7 +91,7 @@ Trajectory::calc_flight_time(mission_item_s waypoint1, mission_item_s waypoint2,
     double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                     (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
 
-    double time = (x/flight_speed) + delivery_time; // Approximate time required to deliver an item
+    double time = (x/flight_speed) + delivery_time + acceleration_time;
 
     return time;
 }
@@ -110,7 +111,7 @@ Trajectory::calc_energy_use(mission_item_s waypoint1, mission_item_s waypoint2, 
     double x = sqrt(pow(earth_radius+alt1, 2)+pow(earth_radius+alt2, 2)-2*(earth_radius+alt1)*
                     (earth_radius+alt2)*(sin(lat1_rad)*sin(lat2_rad)+cos(lat1_rad)*cos(lat2_rad)*cos(lon1_rad-lon2_rad)));
 
-    double time = (x/flight_speed) + delivery_time; // Approximate time required to deliver an item
+    double time = (x/flight_speed) + delivery_time + acceleration_time;
 
     double power;
     //Object instantiation might be missing
@@ -172,7 +173,7 @@ Trajectory::least(int p, int num_waypoints, int completed[], double ** cost_arra
     bool is_final = true;
 
     for (i=0;i<num_waypoints;i++){
-        if((cost_array[p][i]>=0.05)&&(completed[i]==0)){ //Check that this is correct
+        if((cost_array[p][i]>=0.05)&&(completed[i]==0)){ //Perhaps (p != i)
             //For first iteration, pick any point
             if (min == 0){
                 min = cost_array[i][0]+cost_array[p][i];
@@ -234,7 +235,7 @@ Trajectory::calculateTrajectoryCost(std::vector<mission_waypoint_t> uploadedWpsL
 trajectory_cost_t
 Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num_waypoints, int *solutionTrajMatrix, double *solSpeedMatrix, int tempSol[])
 {
-    int curIter, iterationsMax = 1000;
+    int curIter, iterationsMax = 50000;
     bool terminate = false;
     int random_index, tmpTrajPoint, tmpTrajMatrix[num_waypoints], accSolutionThreshold;
     double tmpSpeedMatrix[num_waypoints], randomSpeed;
@@ -283,7 +284,8 @@ Trajectory::solution_sa(std::vector<mission_waypoint_t> uploadedWpsList, int num
             tmpTrajMatrix[random_index+1] = tmpTrajPoint;
 
             /* get random speed too */
-            randomSpeed = INC_FLIGHT_VELOCITY * (std::rand() % FLIGHT_VELOCITY_STEPS);
+            //randomSpeed = INC_FLIGHT_VELOCITY * (std::rand() % FLIGHT_VELOCITY_STEPS);
+            randomSpeed = 5.0;
             tmpSpeedMatrix[random_index] = randomSpeed;
 
             /* Calculate feasibility and cost */
