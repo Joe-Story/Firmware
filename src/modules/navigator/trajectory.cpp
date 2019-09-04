@@ -43,7 +43,6 @@ using namespace std;
 
 double delivery_time = 5.0; /* How close to reality is this? */
 double acceleration_time = 3.0;
-int started = 0;
 
 static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 = NAN)
 {
@@ -73,6 +72,7 @@ bool
 Trajectory::takeoff_cmd(int num_waypoints){
     bool ret = false;
     ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_MISSION_START, 1, num_waypoints);
+    PX4_INFO("Takeoff command issued. Ret is %d\n",ret);
     return ret;
 }
 
@@ -472,9 +472,8 @@ Trajectory::calc_solution(std::vector<mission_waypoint_t> uploadedWpsList, int n
         finalWpsList.push_back(uploadedWpsList[i]); // Initialize with the waypoints index
         finalWpsList[i].departureSpeed = 0;
 
-    }
-    else{
-        PX4_WARN("NUMBER OF WAYPOINTS IS TOO HIGH");
+    } else{
+        PX4_WARN("Number of waypoints too high for brute force calculation");
     }
 
 
@@ -590,7 +589,6 @@ Trajectory::update_trajectory(mission_s mission)
         //Check that waypoints have been found
         if (numOfWaypoints <= 0) {
             PX4_WARN("NO WAYPOINTS FOUND");
-            started++;
             return;
         }
 
@@ -683,7 +681,104 @@ Trajectory::update_trajectory(mission_s mission)
         }
 
         //Command the drone to takeoff, but only if the mission hasn't been completed yet (only lets the drone fly once)
-        if (started == 1){takeoff_cmd(numOfWaypoints);}
-        started++;
+        //takeoff_cmd(numOfWaypoints);
+    }
+}
+
+void
+Trajectory::start_uploaded_trajectory(mission_s mission)
+{
+    vector<mission_waypoint_t> uploadedWpsList;
+    mission_waypoint_t oneWaypoint;
+    int numItems = mission.count;
+    int numOfWaypoints;
+    static bool missionStarted = false;
+    bool write_failed = false;
+
+    if (missionStarted == false) {
+        printf("Mission Count is: %d\n", numItems);
+
+        if (numItems > 0) {
+
+            /* READ MISSION ITEMS */
+            numOfWaypoints = 0;
+            for (int i = 0; i < numItems; i++){
+                struct mission_item_s mission_item {};
+                if (!(dm_read((dm_item_t)mission.dataman_id, i, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s))) {
+                    /* error reading, mission is invalid */
+                    PX4_WARN("READ ERROR");
+                    //mavlink_log_info(_navigator->get_mavlink_log_pub(), "Error reading offboard mission.");
+                    return;
+                }
+
+                /* check only items with valid lat/lon */
+                if (!MissionBlock::item_contains_position(mission_item)) {
+                    continue;
+                } else {
+                    oneWaypoint.waypoint = mission_item;
+                    oneWaypoint.originalIndex = i;
+                    if (oneWaypoint.waypoint.nav_cmd == NAV_CMD_WAYPOINT){
+                        printf("Waypoint weight is %f deadline is %f\n",oneWaypoint.waypoint.payload_weight,oneWaypoint.waypoint.deadline);
+                        uploadedWpsList.push_back(oneWaypoint);
+                        numOfWaypoints++;
+                    }
+                }
+            }
+
+            //Check that waypoints have been found
+            if (numOfWaypoints <= 0) {
+                PX4_WARN("NO WAYPOINTS FOUND");
+                return;
+            } else {
+                //Print all of the received information
+                /*
+                for (int i=0; i < numItems; i++){
+                    printf("Index: %d, Command: %d, Lat: %d\n", i, uploadedWpsList[i].waypoint.nav_cmd, uploadedWpsList[i].waypoint.lat);
+                }
+                */
+
+                printf("Num of Waypoints is: %d\n", numOfWaypoints);
+
+                //Print the received waypoints
+                for (int i = 0; i < numOfWaypoints; i++){
+                    printf("Waypoint %d: Lat: %f Lon: %f Alt: %f nav_cmd: %d\n",
+                        i, uploadedWpsList[i].waypoint.lat, uploadedWpsList[i].waypoint.lon, (double) uploadedWpsList[i].waypoint.altitude, uploadedWpsList[i].waypoint.nav_cmd);
+                }
+
+                 //Write the optimal trajectory to the first memory locations in dataman
+                for (int i=0; i < numOfWaypoints; i++){
+                    dm_lock(DM_KEY_MISSION_STATE);
+                    write_failed = dm_write((dm_item_t)mission.dataman_id, i,
+                                                DM_PERSIST_VOLATILE, &uploadedWpsList[i].waypoint,
+                                                sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
+                    if (write_failed) {
+                        PX4_WARN("My Write failed");
+                    }
+                    dm_unlock(DM_KEY_MISSION_STATE);
+                }
+
+                //Clear remaining items from dataman
+                mission_item_s clear;
+                clear.nav_cmd = 20;
+                clear.altitude = 20;
+                for (int i=numOfWaypoints; i<numItems; i++){
+                    dm_lock(DM_KEY_MISSION_STATE);
+                    write_failed = dm_write((dm_item_t)mission.dataman_id, i,
+                                                DM_PERSIST_VOLATILE, &clear,
+                                                sizeof(struct mission_item_s)) != sizeof(struct mission_item_s);
+                    if (write_failed) {
+                        PX4_WARN("My Write failed");
+                    }
+                    dm_unlock(DM_KEY_MISSION_STATE);
+                }
+
+                //Update the mission count with the new number of items
+                mission.count = numOfWaypoints;
+                numItems = mission.count;
+
+                missionStarted = true;
+                //takeoff_cmd(numOfWaypoints);
+            }
+        }
     }
 }

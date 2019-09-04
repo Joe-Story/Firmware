@@ -209,7 +209,7 @@ void Module::run()
     int error_counter = 0;
 
     FILE *fptr;
-    fptr = fopen("/home/joestory/src/Firmware/src/modules/thrust_logger/logged_data.txt", "w+");
+    fptr = fopen("./logged_data-1.txt", "w");
     if(fptr == NULL){
         PX4_INFO("Error! File not opened ");
         return;
@@ -218,7 +218,7 @@ void Module::run()
     //Check to see if the drone is armed
     orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
     while (arm.armed == false){
-        PX4_INFO("You are not armed!");
+        //PX4_INFO("You are not armed!");
         delay(1000);
         orb_copy(ORB_ID(actuator_armed), armed_sub_fd, &arm);
     }
@@ -250,13 +250,14 @@ void Module::run()
 
             if (fds[0].revents & POLLIN) {
                 orb_copy(ORB_ID(actuator_outputs), actuator_sub_fd, &raw_act);
+                /*
                 PX4_INFO("Thrust:\t%8.4f,\t%8.4f,\t%8.4f,\t%8.4f",
                          (double)raw_act.output[0],
                          (double)raw_act.output[1],
                          (double)raw_act.output[2],
                          (double)raw_act.output[3]);
-
-                fprintf(fptr, "%f , %f , %f , %f ,\n", (double)raw_act.output[0], (double)raw_act.output[1], (double)raw_act.output[2], (double)raw_act.output[3]);
+                */
+                fprintf(fptr, "%f, %f, %f, %f\n", (double)raw_act.output[0], (double)raw_act.output[1], (double)raw_act.output[2], (double)raw_act.output[3]);
 
             }
         }

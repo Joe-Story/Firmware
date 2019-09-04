@@ -57,6 +57,8 @@ class Trajectory
 
         void update_trajectory(mission_s mission);
 
+        void start_uploaded_trajectory(mission_s mission);
+
     private:
         //Physical drone properties
         const double mass = 1.38; // kg

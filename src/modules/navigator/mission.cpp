@@ -62,6 +62,7 @@
 using namespace std;
 
 #include "trajectory.h"
+#include "../thrust_logger/thrust_logger.h"
 
 Mission::Mission(Navigator *navigator) :
 	MissionBlock(navigator),
@@ -1622,16 +1623,42 @@ Mission::set_current_mission_item()
 	save_mission_state();
 }
 
+#define LOG_THRUST
+
 void
 Mission::check_mission_valid(bool force)
 {
+#ifdef LOG_THRUST
+    static bool thrustLoggerRunning = false;
+#endif
+    Trajectory _trajectory;
+
     if ((!_home_inited && _navigator->home_position_valid()) || force) {
+
 
         MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
         PX4_INFO("Check Mission Valid\n");
 
-        Trajectory _trajectory;
+#ifdef LOG_THRUST
+	if (thrustLoggerRunning == false) {
+		thrustLoggerRunning = true;
+		char **argVector; // = {"thrust_logger","start"};
+
+		argVector = (char **) malloc(2 * sizeof(char *));
+		argVector[0] = (char *) malloc(32 * sizeof(char));
+		argVector[1] = (char *) malloc(32 * sizeof(char));
+
+		strcpy(argVector[0],"thrust_logger");
+		strcpy(argVector[1],"start");
+		thrust_logger_main(2, argVector);
+	}
+
+	//_trajectory.start_uploaded_trajectory(_mission);
+#endif
+
+#ifndef LOG_THRUST
         _trajectory.update_trajectory(_mission);
+#endif
 
         _navigator->get_mission_result()->valid =
                 _missionFeasibilityChecker.checkMissionFeasible(_mission,

@@ -1596,6 +1596,7 @@ Commander::run()
 				if (was_landed != land_detector.landed) {
 					if (land_detector.landed) {
 						mavlink_and_console_log_info(&mavlink_log_pub, "Landing detected");
+						system_exit(0);
 
 					} else {
 						mavlink_and_console_log_info(&mavlink_log_pub, "Takeoff detected");
